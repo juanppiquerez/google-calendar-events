@@ -13,12 +13,27 @@ enum BookingStatus {
 }
 
 model User {
-  id        String    @id @default(uuid()) @db.Uuid
-  auth0Id   String    @unique
-  email     String    @unique
-  name      String
-  createdAt DateTime  @default(now())
-  bookings  Booking[]
+  id                   String                @id @default(uuid()) @db.Uuid
+  auth0Id              String                @unique
+  email                String                @unique
+  name                 String
+  createdAt            DateTime              @default(now())
+  bookings             Booking[]
+  bookingIdempotencies BookingIdempotency[]
+}
+
+/// Stores POST /bookings responses keyed by Idempotency-Key header.
+/// Unique on (userId, idempotencyKey); entries older than the TTL are ignored.
+model BookingIdempotency {
+  id             String   @id @default(uuid()) @db.Uuid
+  userId         String   @db.Uuid
+  idempotencyKey String
+  responseBody   Json
+  createdAt      DateTime @default(now())
+  user           User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, idempotencyKey])
+  @@index([createdAt])
 }
 
 model Booking {

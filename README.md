@@ -179,4 +179,16 @@ The NestJS API validates Auth0 JWTs with `passport-jwt` + `jwks-rsa` (signature 
 4. API validates JWT, upserts `User`, returns profile
 5. Expired/invalid JWT → API returns `401` → frontend redirects to login
 
+### Booking conflict detection: application check + PostgreSQL exclusion constraint
+
+Overlapping bookings for the same user are prevented at two layers:
+
+1. **Application layer** — Before inserting, `BookingsService` queries for existing `CONFIRMED` bookings whose time range overlaps the requested slot (`startTime < new.endTime AND endTime > new.startTime`). Adjacent slots (where one ends exactly when the other starts) are allowed.
+
+2. **Database layer (defense in depth)** — A PostgreSQL `EXCLUDE USING gist` constraint on `Booking` prevents two `CONFIRMED` rows for the same `userId` from having overlapping `tsrange(startTime, endTime, '[)')` values. This closes the race-condition window where two concurrent requests both pass the application check before either INSERT completes.
+
+Prisma cannot express this constraint declaratively, so it lives in a manual SQL migration (`btree_gist` extension + `Booking_no_overlap_confirmed`). When the constraint fires, Postgres returns SQLSTATE `23P01`, which the service maps to a `409 Conflict` with a user-facing message distinct from the in-code overlap check (reserved for a future Google Calendar conflict message in phase 3).
+
+**Idempotency** — Optional `Idempotency-Key` header on `POST /bookings` is stored in a `BookingIdempotency` table (unique per `userId` + key). Replays within 10 minutes return the original response without creating a duplicate booking.
+
 <!-- Additional decisions will be documented here phase by phase. -->
