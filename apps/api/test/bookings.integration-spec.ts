@@ -41,6 +41,7 @@ describe('BookingsService (integration)', () => {
 
     const calendarConflictChecker = {
       hasConflict: jest.fn().mockResolvedValue(false),
+      getBusyBlocks: jest.fn().mockResolvedValue([]),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -127,5 +128,70 @@ describe('BookingsService (integration)', () => {
     await expect(service.cancel(userBId, created.id)).rejects.toMatchObject({
       name: 'ForbiddenException',
     });
+  });
+
+  it('returns occupied slots from internal bookings for a day', async () => {
+    const dto = futureSlot(48);
+    await service.create(userAId, dto);
+
+    const date = dto.startTime.slice(0, 10);
+    const availability = await service.getAvailability(userAId, date, 'UTC');
+
+    expect(availability.occupiedSlots).toHaveLength(1);
+    expect(availability.occupiedSlots[0]).toMatchObject({
+      source: 'booking',
+      title: dto.title,
+    });
+    expect(availability.googleCalendarConnected).toBe(false);
+  });
+
+  it('includes Google Calendar busy blocks when connected', async () => {
+    await prisma.googleToken.create({
+      data: {
+        userId: userAId,
+        accessToken: 'enc-access',
+        refreshToken: 'enc-refresh',
+        expiryDate: new Date(Date.now() + 3_600_000),
+        scope: 'https://www.googleapis.com/auth/calendar.freebusy',
+        isValid: true,
+      },
+    });
+
+    const calendarConflictChecker = {
+      hasConflict: jest.fn().mockResolvedValue(false),
+      getBusyBlocks: jest.fn().mockResolvedValue([
+        {
+          start: '2026-07-20T10:00:00.000Z',
+          end: '2026-07-20T11:00:00.000Z',
+        },
+      ]),
+    };
+
+    const module: TestingModule = await Test.createTestingModule({
+      providers: [
+        BookingsService,
+        { provide: PrismaService, useValue: prisma },
+        {
+          provide: CALENDAR_CONFLICT_CHECKER,
+          useValue: calendarConflictChecker,
+        },
+      ],
+    }).compile();
+
+    const availabilityService = module.get(BookingsService);
+    const availability = await availabilityService.getAvailability(
+      userAId,
+      '2026-07-20',
+      'UTC',
+    );
+
+    expect(availability.googleCalendarConnected).toBe(true);
+    expect(availability.occupiedSlots).toEqual([
+      {
+        startTime: '2026-07-20T10:00:00.000Z',
+        endTime: '2026-07-20T11:00:00.000Z',
+        source: 'google_calendar',
+      },
+    ]);
   });
 });

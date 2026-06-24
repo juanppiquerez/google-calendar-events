@@ -10,12 +10,17 @@ describe('BookingsService', () => {
   let prisma: {
     booking: {
       findUnique: jest.Mock;
+      findMany: jest.Mock;
       update: jest.Mock;
+    };
+    googleToken: {
+      findUnique: jest.Mock;
     };
   };
 
   const calendarConflictChecker = {
     hasConflict: jest.fn().mockResolvedValue(false),
+    getBusyBlocks: jest.fn().mockResolvedValue([]),
   };
 
   const ownerId = 'owner-uuid';
@@ -33,10 +38,17 @@ describe('BookingsService', () => {
   };
 
   beforeEach(async () => {
+    calendarConflictChecker.hasConflict.mockReset().mockResolvedValue(false);
+    calendarConflictChecker.getBusyBlocks.mockReset().mockResolvedValue([]);
+
     prisma = {
       booking: {
         findUnique: jest.fn(),
+        findMany: jest.fn(),
         update: jest.fn(),
+      },
+      googleToken: {
+        findUnique: jest.fn(),
       },
     };
 
@@ -52,6 +64,62 @@ describe('BookingsService', () => {
     }).compile();
 
     service = module.get(BookingsService);
+  });
+
+  describe('getAvailability', () => {
+    it('combines internal bookings and Google Calendar busy blocks', async () => {
+      prisma.booking.findMany.mockResolvedValue([
+        {
+          id: 'booking-1',
+          userId: ownerId,
+          title: 'Team sync',
+          startTime: new Date('2026-07-15T14:00:00.000Z'),
+          endTime: new Date('2026-07-15T15:00:00.000Z'),
+          status: BookingStatus.CONFIRMED,
+        },
+      ]);
+      prisma.googleToken.findUnique.mockResolvedValue({ isValid: true });
+      calendarConflictChecker.getBusyBlocks.mockResolvedValue([
+        {
+          start: '2026-07-15T16:00:00.000Z',
+          end: '2026-07-15T17:00:00.000Z',
+        },
+      ]);
+
+      const result = await service.getAvailability(
+        ownerId,
+        '2026-07-15',
+        'UTC',
+      );
+
+      expect(result.date).toBe('2026-07-15');
+      expect(result.googleCalendarConnected).toBe(true);
+      expect(result.occupiedSlots).toHaveLength(2);
+      expect(result.occupiedSlots[0]).toMatchObject({
+        source: 'booking',
+        title: 'Team sync',
+        bookingId: 'booking-1',
+      });
+      expect(result.occupiedSlots[1]).toMatchObject({
+        source: 'google_calendar',
+      });
+      expect(calendarConflictChecker.getBusyBlocks).toHaveBeenCalled();
+    });
+
+    it('skips Google blocks when calendar is not connected', async () => {
+      prisma.booking.findMany.mockResolvedValue([]);
+      prisma.googleToken.findUnique.mockResolvedValue(null);
+
+      const result = await service.getAvailability(
+        ownerId,
+        '2026-07-15',
+        'UTC',
+      );
+
+      expect(result.googleCalendarConnected).toBe(false);
+      expect(result.occupiedSlots).toEqual([]);
+      expect(calendarConflictChecker.getBusyBlocks).not.toHaveBeenCalled();
+    });
   });
 
   describe('cancel', () => {

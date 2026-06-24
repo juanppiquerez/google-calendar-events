@@ -34,15 +34,15 @@ export default async function Home() {
       <div className="mt-8 flex gap-4">
         <Link
           href="/bookings"
-          className="rounded-md bg-neutral-900 px-6 py-3 text-sm font-medium text-white hover:bg-neutral-800"
+          className="rounded-md bg-neutral-900 px-6 py-3 text-sm font-medium text-white hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
         >
-          Mis reservas
+          Ir a mis reservas
         </Link>
         <Link
           href="/dashboard"
-          className="rounded-md border border-neutral-300 px-6 py-3 text-sm font-medium hover:bg-neutral-50"
+          className="rounded-md border border-neutral-300 px-6 py-3 text-sm font-medium hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
         >
-          Ir al dashboard
+          Configuración
         </Link>
         <a
           href="/auth/logout"

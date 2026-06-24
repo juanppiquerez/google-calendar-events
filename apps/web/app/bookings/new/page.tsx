@@ -1,9 +1,9 @@
 import { redirect } from 'next/navigation';
+import { BookingForm } from '@/app/components/booking-form';
 import { DashboardShell } from '@/app/components/dashboard-shell';
 import { auth0 } from '@/lib/auth0';
-import { BookingsPageClient } from './bookings-page-client';
 
-export default async function BookingsPage() {
+export default async function NewBookingPage() {
   const session = await auth0.getSession();
 
   if (!session) {
@@ -15,7 +15,7 @@ export default async function BookingsPage() {
       userName={session.user.name ?? session.user.email ?? 'Usuario'}
       userEmail={session.user.email ?? undefined}
     >
-      <BookingsPageClient />
+      <BookingForm />
     </DashboardShell>
   );
 }

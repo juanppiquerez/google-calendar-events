@@ -2,6 +2,13 @@
 
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useState } from 'react';
+import { toast } from 'sonner';
+import { ConfirmDialog } from '@/app/components/confirm-dialog';
+import { ErrorState } from '@/app/components/ui/error-state';
+import { Skeleton } from '@/app/components/ui/skeleton';
+import { Spinner } from '@/app/components/ui/spinner';
+import { getErrorMessage, redirectOnUnauthorized } from '@/lib/api-error';
+import { useRedirectOnUnauthorized } from '@/lib/use-redirect-on-unauthorized';
 import {
   disconnectGoogle,
   fetchGoogleStatus,
@@ -13,12 +20,13 @@ const GOOGLE_STATUS_KEY = ['google', 'status'] as const;
 export function GoogleCalendarCard() {
   const queryClient = useQueryClient();
   const [showDisconnectConfirm, setShowDisconnectConfirm] = useState(false);
-  const [actionError, setActionError] = useState<string | null>(null);
 
   const statusQuery = useQuery({
     queryKey: GOOGLE_STATUS_KEY,
     queryFn: fetchGoogleStatus,
   });
+
+  useRedirectOnUnauthorized(statusQuery.error);
 
   const connectMutation = useMutation({
     mutationFn: getGoogleConnectUrl,
@@ -26,10 +34,9 @@ export function GoogleCalendarCard() {
       window.location.href = url;
     },
     onError: (error: unknown) => {
-      setActionError(
-        error instanceof Error
-          ? error.message
-          : 'No se pudo iniciar la conexión con Google',
+      redirectOnUnauthorized(error);
+      toast.error(
+        getErrorMessage(error, 'No se pudo iniciar la conexión con Google'),
       );
     },
   });
@@ -38,14 +45,13 @@ export function GoogleCalendarCard() {
     mutationFn: disconnectGoogle,
     onSuccess: () => {
       setShowDisconnectConfirm(false);
-      setActionError(null);
+      toast.success('Google Calendar desconectado');
       void queryClient.invalidateQueries({ queryKey: GOOGLE_STATUS_KEY });
     },
     onError: (error: unknown) => {
-      setActionError(
-        error instanceof Error
-          ? error.message
-          : 'No se pudo desconectar Google Calendar',
+      redirectOnUnauthorized(error);
+      toast.error(
+        getErrorMessage(error, 'No se pudo desconectar Google Calendar'),
       );
     },
   });
@@ -55,36 +61,54 @@ export function GoogleCalendarCard() {
     statusQuery.data?.connected && statusQuery.data?.isValid === false;
 
   return (
-    <section className="mt-6 w-full max-w-md rounded-lg border border-neutral-200 p-6">
-      <h2 className="text-lg font-medium">Google Calendar</h2>
+    <section
+      aria-labelledby="google-calendar-heading"
+      className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6"
+    >
+      <h2 id="google-calendar-heading" className="text-lg font-semibold text-neutral-900">
+        Google Calendar
+      </h2>
       <p className="mt-2 text-sm text-neutral-600">
-        Conectá tu calendario para detectar conflictos con eventos reales al
-        crear reservas. Es independiente del inicio de sesión con Auth0.
+        Conectá tu calendario para detectar conflictos con eventos reales al crear
+        reservas. Es independiente del inicio de sesión con Auth0.
       </p>
 
       {statusQuery.isLoading && (
-        <p className="mt-4 text-sm text-neutral-500">Verificando estado…</p>
+        <div className="mt-4 space-y-2">
+          <Skeleton className="mt-4 h-5 w-48" />
+          <Skeleton className="h-10 w-56" />
+        </div>
       )}
 
       {statusQuery.isError && (
-        <p className="mt-4 text-sm text-red-600">
-          No se pudo cargar el estado de Google Calendar.
-        </p>
+        <div className="mt-4">
+          <ErrorState
+            error={statusQuery.error}
+            fallbackMessage="No se pudo cargar el estado de Google Calendar"
+            onRetry={() => void statusQuery.refetch()}
+          />
+        </div>
       )}
 
       {statusQuery.isSuccess && (
         <div className="mt-4">
+          {statusQuery.isFetching && !statusQuery.isLoading && (
+            <div className="mb-3">
+              <Spinner label="Actualizando estado…" />
+            </div>
+          )}
+
           {connected ? (
-            <p className="text-sm font-medium text-green-700">
-              Google Calendar conectado ✅
+            <p className="text-sm font-medium text-emerald-800">
+              Google Calendar conectado
             </p>
           ) : needsReconnect ? (
-            <p className="text-sm font-medium text-amber-700">
-              Conexión expirada ⚠️ — Reconectá tu cuenta de Google
+            <p className="text-sm font-medium text-amber-800">
+              Conexión expirada — reconectá tu cuenta de Google
             </p>
           ) : (
-            <p className="text-sm font-medium text-amber-700">
-              No conectado ⚠️ — Conectar
+            <p className="text-sm font-medium text-amber-800">
+              No conectado — conectá para ver conflictos de calendario
             </p>
           )}
 
@@ -93,11 +117,8 @@ export function GoogleCalendarCard() {
               <button
                 type="button"
                 disabled={connectMutation.isPending}
-                onClick={() => {
-                  setActionError(null);
-                  connectMutation.mutate();
-                }}
-                className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800 disabled:opacity-50"
+                onClick={() => connectMutation.mutate()}
+                className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 disabled:opacity-50"
               >
                 {connectMutation.isPending
                   ? 'Redirigiendo…'
@@ -111,7 +132,7 @@ export function GoogleCalendarCard() {
               <button
                 type="button"
                 onClick={() => setShowDisconnectConfirm(true)}
-                className="rounded-md border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
+                className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
               >
                 Desconectar Google Calendar
               </button>
@@ -120,47 +141,16 @@ export function GoogleCalendarCard() {
         </div>
       )}
 
-      {actionError && (
-        <p className="mt-3 text-sm text-red-600">{actionError}</p>
-      )}
-
-      {showDisconnectConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
-          <div
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="disconnect-google-title"
-            className="w-full max-w-md rounded-lg bg-white p-6 shadow-lg"
-          >
-            <h3 id="disconnect-google-title" className="text-lg font-medium">
-              ¿Desconectar Google Calendar?
-            </h3>
-            <p className="mt-2 text-sm text-neutral-600">
-              Las nuevas reservas ya no se verificarán contra tu calendario de
-              Google. Podés volver a conectar cuando quieras.
-            </p>
-            <div className="mt-6 flex justify-end gap-3">
-              <button
-                type="button"
-                onClick={() => setShowDisconnectConfirm(false)}
-                className="rounded-md border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
-              >
-                Cancelar
-              </button>
-              <button
-                type="button"
-                disabled={disconnectMutation.isPending}
-                onClick={() => disconnectMutation.mutate()}
-                className="rounded-md bg-red-600 px-4 py-2 text-sm text-white hover:bg-red-700 disabled:opacity-50"
-              >
-                {disconnectMutation.isPending
-                  ? 'Desconectando…'
-                  : 'Confirmar desconexión'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmDialog
+        open={showDisconnectConfirm}
+        title="¿Desconectar Google Calendar?"
+        description="Las nuevas reservas ya no se verificarán contra tu calendario de Google. Podés volver a conectar cuando quieras."
+        confirmLabel="Confirmar desconexión"
+        destructive
+        isPending={disconnectMutation.isPending}
+        onCancel={() => setShowDisconnectConfirm(false)}
+        onConfirm={() => disconnectMutation.mutate()}
+      />
     </section>
   );
 }

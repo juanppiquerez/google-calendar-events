@@ -15,6 +15,8 @@ import { PrismaService } from '../prisma/prisma.service';
 import { BookingResponse, toBookingResponse } from './booking.mapper';
 import { CreateBookingDto } from './dto/create-booking.dto';
 import { isExclusionViolation } from './postgres-errors';
+import { getDayBoundaries } from './day-boundaries';
+import type { AvailabilityResponse, OccupiedSlot } from './availability.types';
 
 /** Idempotency keys are honored for this window after the original request. */
 export const IDEMPOTENCY_TTL_MINUTES = 10;
@@ -45,6 +47,59 @@ export class BookingsService {
     });
 
     return bookings.map(toBookingResponse);
+  }
+
+  async getAvailability(
+    userId: string,
+    date: string,
+    timeZone = 'UTC',
+  ): Promise<AvailabilityResponse> {
+    const { dayStart, dayEnd } = getDayBoundaries(date, timeZone);
+
+    const [bookings, googleToken] = await Promise.all([
+      this.prisma.booking.findMany({
+        where: {
+          userId,
+          status: BookingStatus.CONFIRMED,
+          startTime: { lt: dayEnd },
+          endTime: { gt: dayStart },
+        },
+        orderBy: { startTime: 'asc' },
+      }),
+      this.prisma.googleToken.findUnique({ where: { userId } }),
+    ]);
+
+    const googleCalendarConnected = Boolean(googleToken?.isValid);
+    const googleBlocks = googleCalendarConnected
+      ? await this.calendarConflictChecker.getBusyBlocks(userId, dayStart, dayEnd)
+      : [];
+
+    const bookingSlots: OccupiedSlot[] = bookings.map((booking) => ({
+      startTime: booking.startTime.toISOString(),
+      endTime: booking.endTime.toISOString(),
+      source: 'booking',
+      bookingId: booking.id,
+      title: booking.title,
+    }));
+
+    const googleSlots: OccupiedSlot[] = googleBlocks.map((block) => ({
+      startTime: block.start,
+      endTime: block.end,
+      source: 'google_calendar',
+    }));
+
+    const occupiedSlots = [...bookingSlots, ...googleSlots].sort((a, b) =>
+      a.startTime.localeCompare(b.startTime),
+    );
+
+    return {
+      date,
+      timeZone,
+      dayStart: dayStart.toISOString(),
+      dayEnd: dayEnd.toISOString(),
+      occupiedSlots,
+      googleCalendarConnected,
+    };
   }
 
   async create(

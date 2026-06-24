@@ -1,4 +1,8 @@
-import type { Booking, CreateBookingDto } from '@booking/shared-types';
+import type {
+  AvailabilityResponse,
+  Booking,
+  CreateBookingDto,
+} from '@booking/shared-types';
 import { BookingStatus } from '@booking/shared-types';
 
 export class BookingsApiError extends Error {
@@ -81,4 +85,25 @@ export async function cancelBooking(
   }
 
   return response.json() as Promise<{ message: string; booking: Booking }>;
+}
+
+export async function fetchAvailability(
+  date: string,
+  timeZone?: string,
+): Promise<AvailabilityResponse> {
+  const params = new URLSearchParams({ date });
+  if (timeZone) {
+    params.set('timeZone', timeZone);
+  }
+
+  const response = await fetch(`/api/bookings/availability?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new BookingsApiError(
+      response.status,
+      await parseErrorMessage(response),
+    );
+  }
+
+  return response.json() as Promise<AvailabilityResponse>;
 }

@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { auth0 } from '@/lib/auth0';
+import { GoogleConnectedToast } from './google-connected-toast';
 
 export default async function GoogleConnectedPage() {
   const session = await auth0.getSession();
@@ -11,6 +12,7 @@ export default async function GoogleConnectedPage() {
 
   return (
     <main className="flex min-h-screen flex-col items-center justify-center p-8">
+      <GoogleConnectedToast />
       <div className="w-full max-w-md rounded-lg border border-green-200 bg-green-50 p-8 text-center">
         <p className="text-4xl" aria-hidden>
           ✅

@@ -128,12 +128,21 @@ export class GoogleService implements CalendarConflictChecker {
   }
 
   async hasConflict(userId: string, start: Date, end: Date): Promise<boolean> {
+    const busy = await this.getBusyBlocks(userId, start, end);
+    return busyBlocksOverlap(busy, start, end);
+  }
+
+  async getBusyBlocks(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<Array<{ start: string; end: string }>> {
     const token = await this.prisma.googleToken.findUnique({
       where: { userId },
     });
 
     if (!token || !token.isValid) {
-      return false;
+      return [];
     }
 
     let accessToken: string;
@@ -147,7 +156,7 @@ export class GoogleService implements CalendarConflictChecker {
       this.logger.error(
         `Failed to decrypt Google tokens for user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return false;
+      return [];
     }
 
     const needsRefresh =
@@ -156,7 +165,7 @@ export class GoogleService implements CalendarConflictChecker {
     if (needsRefresh) {
       const refreshed = await this.refreshAccessToken(userId, token, refreshToken);
       if (!refreshed) {
-        return false;
+        return [];
       }
 
       accessToken = refreshed.accessToken;
@@ -170,12 +179,17 @@ export class GoogleService implements CalendarConflictChecker {
         GOOGLE_API_INITIAL_BACKOFF_MS,
       );
 
-      return busyBlocksOverlap(busy, start, end);
+      return busy
+        .filter((block) => block.start && block.end)
+        .map((block) => ({
+          start: block.start!,
+          end: block.end!,
+        }));
     } catch (error) {
       this.logger.warn(
-        `No se pudo verificar Google Calendar para user ${userId}, booking creado sin esa verificación: ${error instanceof Error ? error.message : String(error)}`,
+        `No se pudo consultar Google Calendar para user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return false;
+      return [];
     }
   }
 
