@@ -4,9 +4,10 @@ import {
 } from '@testcontainers/postgresql';
 import { execSync } from 'node:child_process';
 import path from 'node:path';
-import { PrismaClient } from '@prisma/client';
 import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
+import { PrismaClient } from '@prisma/client';
+import { CALENDAR_CONFLICT_CHECKER } from '../src/google/google.types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { BookingsService } from '../src/bookings/bookings.service';
 
@@ -38,10 +39,18 @@ describe('BookingsService (integration)', () => {
     prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
     await prisma.$connect();
 
+    const calendarConflictChecker = {
+      hasConflict: jest.fn().mockResolvedValue(false),
+    };
+
     const module: TestingModule = await Test.createTestingModule({
       providers: [
         BookingsService,
         { provide: PrismaService, useValue: prisma },
+        {
+          provide: CALENDAR_CONFLICT_CHECKER,
+          useValue: calendarConflictChecker,
+        },
       ],
     }).compile();
 

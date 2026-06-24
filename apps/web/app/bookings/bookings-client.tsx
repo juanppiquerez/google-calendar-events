@@ -18,6 +18,12 @@ import {
 
 const BOOKINGS_QUERY_KEY = ['bookings'] as const;
 
+const GOOGLE_CALENDAR_CONFLICT_HINT = 'Google Calendar';
+
+function isGoogleCalendarConflict(message: string): boolean {
+  return message.includes(GOOGLE_CALENDAR_CONFLICT_HINT);
+}
+
 function defaultDateValue() {
   const tomorrow = new Date();
   tomorrow.setDate(tomorrow.getDate() + 1);
@@ -156,8 +162,24 @@ export function BookingsClient() {
           </div>
 
           {formError && (
-            <p className="rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-              {formError}
+            <p
+              className={`rounded-md px-3 py-2 text-sm ${
+                isGoogleCalendarConflict(formError)
+                  ? 'border border-amber-200 bg-amber-50 text-amber-900'
+                  : 'bg-red-50 text-red-700'
+              }`}
+            >
+              {isGoogleCalendarConflict(formError) ? (
+                <>
+                  <span className="font-medium">Conflicto con tu Google Calendar:</span>{' '}
+                  {formError}
+                </>
+              ) : (
+                <>
+                  <span className="font-medium">Conflicto con reserva interna:</span>{' '}
+                  {formError}
+                </>
+              )}
             </p>
           )}
 

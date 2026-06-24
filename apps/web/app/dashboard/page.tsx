@@ -3,9 +3,15 @@ import Link from 'next/link';
 import { redirect } from 'next/navigation';
 import { ApiError, apiFetch } from '@/lib/api-client';
 import { auth0 } from '@/lib/auth0';
+import { GoogleCalendarCard } from './google-calendar-card';
 
-export default async function DashboardPage() {
+export default async function DashboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ google?: string }>;
+}) {
   const session = await auth0.getSession();
+  const params = await searchParams;
 
   if (!session) {
     redirect('/auth/login?connection=google-oauth2');
@@ -29,6 +35,12 @@ export default async function DashboardPage() {
       <p className="mt-4 text-neutral-600">
         Sesión Auth0 y usuario en base de datos verificados correctamente.
       </p>
+
+      {params.google === 'error' && (
+        <p className="mt-4 rounded-md bg-red-50 px-4 py-2 text-sm text-red-700">
+          No se pudo conectar Google Calendar. Intentá de nuevo.
+        </p>
+      )}
 
       <section className="mt-8 w-full max-w-md rounded-lg border border-neutral-200 p-6">
         <h2 className="text-lg font-medium">Sesión Auth0</h2>
@@ -65,6 +77,8 @@ export default async function DashboardPage() {
           </div>
         </dl>
       </section>
+
+      <GoogleCalendarCard />
 
       <div className="mt-8 flex gap-4">
         <Link

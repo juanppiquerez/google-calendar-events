@@ -1,6 +1,7 @@
 import { ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Booking, BookingStatus } from '@prisma/client';
+import { CALENDAR_CONFLICT_CHECKER } from '../google/google.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookingsService } from './bookings.service';
 
@@ -11,6 +12,10 @@ describe('BookingsService', () => {
       findUnique: jest.Mock;
       update: jest.Mock;
     };
+  };
+
+  const calendarConflictChecker = {
+    hasConflict: jest.fn().mockResolvedValue(false),
   };
 
   const ownerId = 'owner-uuid';
@@ -39,6 +44,10 @@ describe('BookingsService', () => {
       providers: [
         BookingsService,
         { provide: PrismaService, useValue: prisma },
+        {
+          provide: CALENDAR_CONFLICT_CHECKER,
+          useValue: calendarConflictChecker,
+        },
       ],
     }).compile();
 

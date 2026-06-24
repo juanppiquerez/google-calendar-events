@@ -1,10 +1,16 @@
 import {
   ConflictException,
   ForbiddenException,
+  Inject,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { BookingStatus, Prisma } from '@prisma/client';
+import { GOOGLE_CALENDAR_CONFLICT_MESSAGE } from '../google/google.constants';
+import {
+  CALENDAR_CONFLICT_CHECKER,
+  type CalendarConflictChecker,
+} from '../google/google.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookingResponse, toBookingResponse } from './booking.mapper';
 import { CreateBookingDto } from './dto/create-booking.dto';
@@ -20,7 +26,11 @@ const RACE_CONFLICT_MESSAGE =
 
 @Injectable()
 export class BookingsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(CALENDAR_CONFLICT_CHECKER)
+    private readonly calendarConflictChecker: CalendarConflictChecker,
+  ) {}
 
   async findAllForUser(
     userId: string,
@@ -63,6 +73,16 @@ export class BookingsService {
 
     if (conflicting) {
       throw new ConflictException(INTERNAL_CONFLICT_MESSAGE);
+    }
+
+    const googleConflict = await this.calendarConflictChecker.hasConflict(
+      userId,
+      startTime,
+      endTime,
+    );
+
+    if (googleConflict) {
+      throw new ConflictException(GOOGLE_CALENDAR_CONFLICT_MESSAGE);
     }
 
     try {
