@@ -120,4 +120,63 @@ We use **npm workspaces** for dependency linking (e.g. `@booking/shared-types` i
 
 **PostgreSQL** provides reliable ACID transactions, strong constraint support, and efficient range queries — important for detecting overlapping bookings. **Prisma** gives type-safe database access, declarative schema migrations, and a generated client that integrates cleanly with NestJS. The initial schema includes `User` and `Booking` models; Google OAuth token storage will be added in a later phase.
 
+### Authentication: Auth0 for application identity only
+
+**Auth0** handles user login (Google as the identity provider inside Auth0) and issues JWT access tokens for our API. The session lives in **httpOnly cookies** managed by `@auth0/nextjs-auth0` on the Next.js app — tokens are never stored in `localStorage` or client-side React state.
+
+**Auth0 is not used for Google Calendar API access.** Calendar OAuth (refresh tokens, scopes, etc.) will be implemented in a later phase as a separate, explicit OAuth2 flow. Treat Auth0 purely as the application session / identity provider.
+
+The NestJS API validates Auth0 JWTs with `passport-jwt` + `jwks-rsa` (signature via JWKS, `aud` and `iss` checks). On first authenticated request, the API upserts a `User` row keyed by `auth0Id`.
+
+### Auth0 setup (Dashboard)
+
+1. **Create a Regular Web Application** in [Auth0 Dashboard](https://manage.auth0.com) → Applications → Create Application → Regular Web Applications.
+
+2. **Application settings** (replace port if you changed `WEB_PORT` / `APP_BASE_URL`):
+
+   | Setting | Value |
+   | ------- | ----- |
+   | Allowed Callback URLs | `http://localhost:3000/auth/callback` |
+   | Allowed Logout URLs | `http://localhost:3000` |
+   | Allowed Web Origins | `http://localhost:3000` |
+
+   Copy **Domain**, **Client ID**, and **Client Secret** into `.env`.
+
+3. **Enable Google social login**: Authentication → Social → Google (use your Google OAuth credentials or Auth0 dev keys for testing).
+
+4. **Create an API** (Applications → APIs → Create API):
+   - **Name:** Booking System API (or any name)
+   - **Identifier:** e.g. `https://booking-api` — this is your `AUTH0_AUDIENCE`
+   - **Signing Algorithm:** RS256
+
+5. **Add custom claims to the access token** (optional but recommended so `email` and `name` reach the API): Actions → Library → Build Custom → *Login / Post Login*:
+
+   ```javascript
+   exports.onExecutePostLogin = async (event, api) => {
+     const namespace = 'https://booking.app';
+     if (event.authorization) {
+       api.accessToken.setCustomClaim(`${namespace}/email`, event.user.email);
+       api.accessToken.setCustomClaim(`${namespace}/name`, event.user.name);
+     }
+   };
+   ```
+
+   Deploy the action and add it to the Login flow.
+
+6. **Generate `AUTH0_SECRET`** for cookie encryption:
+
+   ```bash
+   openssl rand -hex 32
+   ```
+
+7. Fill `.env` from `.env.example`: `AUTH0_DOMAIN`, `AUTH0_CLIENT_ID`, `AUTH0_CLIENT_SECRET`, `AUTH0_AUDIENCE`, `AUTH0_SECRET`, `APP_BASE_URL`.
+
+### Auth flow (end-to-end)
+
+1. User clicks **Iniciar sesión con Google** → `/auth/login?connection=google-oauth2`
+2. Auth0 completes OAuth; SDK stores session in httpOnly cookies
+3. Dashboard server component calls `GET /api/v1/users/me` with `Authorization: Bearer <access_token>`
+4. API validates JWT, upserts `User`, returns profile
+5. Expired/invalid JWT → API returns `401` → frontend redirects to login
+
 <!-- Additional decisions will be documented here phase by phase. -->

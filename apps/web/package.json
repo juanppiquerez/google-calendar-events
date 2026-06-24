@@ -11,10 +11,12 @@
     "test": "echo \"No tests yet\" && exit 0"
   },
   "dependencies": {
+    "@auth0/nextjs-auth0": "^4.23.0",
     "@booking/shared-types": "*",
     "next": "15.5.19",
     "react": "19.1.0",
-    "react-dom": "19.1.0"
+    "react-dom": "19.1.0",
+    "server-only": "^0.0.1"
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
