@@ -6,6 +6,11 @@ import {
   Res,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import {
+  THROTTLE_STRICT_LIMIT,
+  THROTTLE_STRICT_TTL_MS,
+} from '../common/constants/throttle.constants';
 import type { Response } from 'express';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -21,6 +26,9 @@ export class GoogleController {
   ) {}
 
   @Get('connect')
+  @Throttle({
+    default: { limit: THROTTLE_STRICT_LIMIT, ttl: THROTTLE_STRICT_TTL_MS },
+  })
   @UseGuards(JwtAuthGuard)
   async connect(@CurrentUser() authUser: AuthUser) {
     const user = await this.resolveUser(authUser);
@@ -29,6 +37,9 @@ export class GoogleController {
   }
 
   @Get('callback')
+  @Throttle({
+    default: { limit: THROTTLE_STRICT_LIMIT, ttl: THROTTLE_STRICT_TTL_MS },
+  })
   async callback(
     @Query('code') code: string | undefined,
     @Query('state') state: string | undefined,

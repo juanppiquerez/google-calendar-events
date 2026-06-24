@@ -243,4 +243,22 @@ Revoked tokens are marked `isValid: false` so the dashboard can prompt the user 
 5. API exchanges code, encrypts tokens, upserts `GoogleToken`, redirects to `/dashboard/google-connected`
 6. Future `POST /bookings` calls `freebusy.query` on the primary calendar before insert
 
+## Security
+
+Hardening measures applied before production testing and deploy:
+
+| Area | Measure |
+| ---- | ------- |
+| Rate limiting | `@nestjs/throttler` globally (100 req/min/IP); **10 req/min** on `POST /bookings`, `GET /google/connect`, and `GET /google/callback` |
+| CORS | Exact frontend origin from `APP_BASE_URL` only; `credentials: false` (browser uses same-origin Next.js API routes) |
+| HTTP headers | **Helmet** for standard security headers |
+| Input validation | Global `ValidationPipe` with `whitelist` + `forbidNonWhitelisted` on all DTOs |
+| Errors | Global exception filter: generic `5xx` messages in production; details logged server-side |
+| Health | `GET /api/v1/health` (no auth) checks PostgreSQL connectivity — used by Docker healthcheck |
+| Secrets | Env-only configuration; `.env` gitignored; Google OAuth tokens encrypted at rest |
+| Auth0 session | httpOnly cookies via `@auth0/nextjs-auth0`; JWT never in DOM, query params, or client `console` |
+| XSS | User content (e.g. booking titles) rendered via React text nodes only — no `dangerouslySetInnerHTML` |
+
+See [SECURITY.md](./SECURITY.md) for reporting vulnerabilities and operational guidance.
+
 <!-- Additional decisions will be documented here phase by phase. -->

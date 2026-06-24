@@ -9,6 +9,11 @@ import {
   Query,
   UseGuards,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
+import {
+  THROTTLE_STRICT_LIMIT,
+  THROTTLE_STRICT_TTL_MS,
+} from '../common/constants/throttle.constants';
 import { BookingStatus } from '@prisma/client';
 import type { AuthUser } from '../auth/auth-user.interface';
 import { CurrentUser } from '../auth/current-user.decorator';
@@ -49,6 +54,9 @@ export class BookingsController {
   }
 
   @Post()
+  @Throttle({
+    default: { limit: THROTTLE_STRICT_LIMIT, ttl: THROTTLE_STRICT_TTL_MS },
+  })
   async create(
     @CurrentUser() authUser: AuthUser,
     @Body() dto: CreateBookingDto,
