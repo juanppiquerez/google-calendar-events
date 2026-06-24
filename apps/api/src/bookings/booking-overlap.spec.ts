@@ -36,4 +36,34 @@ describe('rangesOverlap', () => {
     expect(rangesOverlap(hour(10), hour(11), hour(11), hour(12))).toBe(false);
     expect(rangesOverlap(hour(11), hour(12), hour(10), hour(11))).toBe(false);
   });
+
+  it('detects overlap when ranges share only the start instant', () => {
+    expect(rangesOverlap(hour(10), hour(11), hour(10), hour(10, 30))).toBe(true);
+  });
+
+  it('detects overlap when ranges share only the end instant', () => {
+    expect(rangesOverlap(hour(10), hour(11), hour(10, 30), hour(11))).toBe(true);
+  });
+
+  it('returns false when one range ends before the other starts (gap)', () => {
+    expect(rangesOverlap(hour(8), hour(9), hour(10), hour(11))).toBe(false);
+  });
+
+  it('is symmetric regardless of argument order', () => {
+    const aStart = hour(10);
+    const aEnd = hour(12);
+    const bStart = hour(11);
+    const bEnd = hour(13);
+    expect(rangesOverlap(aStart, aEnd, bStart, bEnd)).toBe(
+      rangesOverlap(bStart, bEnd, aStart, aEnd),
+    );
+  });
+
+  it('detects overlap with millisecond-precision boundaries', () => {
+    const startA = new Date('2026-06-25T10:00:00.001Z');
+    const endA = new Date('2026-06-25T11:00:00.000Z');
+    const startB = new Date('2026-06-25T10:59:59.999Z');
+    const endB = new Date('2026-06-25T12:00:00.000Z');
+    expect(rangesOverlap(startA, endA, startB, endB)).toBe(true);
+  });
 });

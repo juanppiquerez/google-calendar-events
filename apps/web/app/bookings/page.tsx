@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation';
 import { DashboardShell } from '@/app/components/dashboard-shell';
-import { auth0 } from '@/lib/auth0';
+import { getAppSession } from '@/lib/get-app-session';
 import { BookingsPageClient } from './bookings-page-client';
 
 export default async function BookingsPage() {
-  const session = await auth0.getSession();
+  const session = await getAppSession();
 
   if (!session) {
     redirect('/auth/login?connection=google-oauth2');

@@ -1,10 +1,10 @@
 import Link from 'next/link';
 import { redirect } from 'next/navigation';
-import { auth0 } from '@/lib/auth0';
+import { getAppSession } from '@/lib/get-app-session';
 import { GoogleConnectedToast } from './google-connected-toast';
 
 export default async function GoogleConnectedPage() {
-  const session = await auth0.getSession();
+  const session = await getAppSession();
 
   if (!session) {
     redirect('/auth/login?connection=google-oauth2');

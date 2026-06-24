@@ -32,4 +32,18 @@ describe('JwtAuthGuard', () => {
       guard.handleRequest(null, false, invalidError, context),
     ).toThrow(new UnauthorizedException('Invalid or missing access token'));
   });
+
+  it('throws 401 when user is false without specific token error', () => {
+    expect(() => guard.handleRequest(null, false, undefined, context)).toThrow(
+      new UnauthorizedException('Invalid or missing access token'),
+    );
+  });
+
+  it('throws 401 when passport returns an error', () => {
+    const authError = new Error('authentication failed');
+
+    expect(() =>
+      guard.handleRequest(authError, false, undefined, context),
+    ).toThrow(new UnauthorizedException('Invalid or missing access token'));
+  });
 });

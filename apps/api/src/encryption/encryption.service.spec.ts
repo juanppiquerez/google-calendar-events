@@ -33,3 +33,64 @@ describe('EncryptionService', () => {
     expect(service.decrypt(second)).toBe(plaintext);
   });
 });
+
+describe('EncryptionService error paths', () => {
+  it('throws when ENCRYPTION_KEY is missing', async () => {
+    delete process.env.ENCRYPTION_KEY;
+
+    const module = await Test.createTestingModule({
+      providers: [EncryptionService],
+    }).compile();
+
+    const svc = module.get(EncryptionService);
+    expect(() => svc.onModuleInit()).toThrow(
+      'ENCRYPTION_KEY environment variable is required',
+    );
+  });
+
+  it('throws when ENCRYPTION_KEY is not 32 bytes', async () => {
+    process.env.ENCRYPTION_KEY = 'abcd';
+
+    const module = await Test.createTestingModule({
+      providers: [EncryptionService],
+    }).compile();
+
+    const svc = module.get(EncryptionService);
+    expect(() => svc.onModuleInit()).toThrow(
+      'ENCRYPTION_KEY must be a 32-byte value encoded as 64 hex characters',
+    );
+  });
+
+  it('throws on malformed ciphertext format', async () => {
+    process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+
+    const module = await Test.createTestingModule({
+      providers: [EncryptionService],
+    }).compile();
+
+    const svc = module.get(EncryptionService);
+    svc.onModuleInit();
+
+    expect(() => svc.decrypt('not-valid-ciphertext')).toThrow(
+      'Invalid ciphertext format',
+    );
+  });
+
+  it('throws when decrypting tampered ciphertext', async () => {
+    process.env.ENCRYPTION_KEY = 'a'.repeat(64);
+
+    const module = await Test.createTestingModule({
+      providers: [EncryptionService],
+    }).compile();
+
+    const svc = module.get(EncryptionService);
+    svc.onModuleInit();
+
+    const ciphertext = svc.encrypt('secret');
+    const parts = ciphertext.split(':');
+    parts[2] = `${parts[2]}ff`;
+    const tampered = parts.join(':');
+
+    expect(() => svc.decrypt(tampered)).toThrow();
+  });
+});

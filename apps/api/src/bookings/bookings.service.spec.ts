@@ -1,6 +1,7 @@
-import { ForbiddenException, NotFoundException } from '@nestjs/common';
+import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Booking, BookingStatus } from '@prisma/client';
+import { GOOGLE_CALENDAR_CONFLICT_MESSAGE } from '../google/google.constants';
 import { CALENDAR_CONFLICT_CHECKER } from '../google/google.types';
 import { PrismaService } from '../prisma/prisma.service';
 import { BookingsService } from './bookings.service';
@@ -11,10 +12,16 @@ describe('BookingsService', () => {
     booking: {
       findUnique: jest.Mock;
       findMany: jest.Mock;
+      findFirst: jest.Mock;
+      create: jest.Mock;
       update: jest.Mock;
     };
     googleToken: {
       findUnique: jest.Mock;
+    };
+    bookingIdempotency: {
+      findFirst: jest.Mock;
+      create: jest.Mock;
     };
   };
 
@@ -45,10 +52,16 @@ describe('BookingsService', () => {
       booking: {
         findUnique: jest.fn(),
         findMany: jest.fn(),
+        findFirst: jest.fn(),
+        create: jest.fn(),
         update: jest.fn(),
       },
       googleToken: {
         findUnique: jest.fn(),
+      },
+      bookingIdempotency: {
+        findFirst: jest.fn(),
+        create: jest.fn(),
       },
     };
 
@@ -64,6 +77,84 @@ describe('BookingsService', () => {
     }).compile();
 
     service = module.get(BookingsService);
+  });
+
+  describe('create', () => {
+    const dto = {
+      title: 'New meeting',
+      startTime: '2026-08-01T10:00:00.000Z',
+      endTime: '2026-08-01T11:00:00.000Z',
+    };
+
+    it('throws ConflictException when an internal booking overlaps', async () => {
+      prisma.bookingIdempotency.findFirst.mockResolvedValue(null);
+      prisma.booking.findFirst.mockResolvedValue(confirmedBooking);
+
+      await expect(service.create(ownerId, dto)).rejects.toBeInstanceOf(
+        ConflictException,
+      );
+      expect(calendarConflictChecker.hasConflict).not.toHaveBeenCalled();
+    });
+
+    it('throws ConflictException when Google Calendar reports a conflict', async () => {
+      prisma.bookingIdempotency.findFirst.mockResolvedValue(null);
+      prisma.booking.findFirst.mockResolvedValue(null);
+      calendarConflictChecker.hasConflict.mockResolvedValue(true);
+
+      await expect(service.create(ownerId, dto)).rejects.toMatchObject({
+        message: GOOGLE_CALENDAR_CONFLICT_MESSAGE,
+      });
+      expect(prisma.booking.create).not.toHaveBeenCalled();
+    });
+
+    it('creates a booking when no conflicts exist', async () => {
+      prisma.bookingIdempotency.findFirst.mockResolvedValue(null);
+      prisma.booking.findFirst.mockResolvedValue(null);
+      prisma.booking.create.mockResolvedValue({
+        ...confirmedBooking,
+        title: dto.title,
+      });
+
+      const result = await service.create(ownerId, dto);
+
+      expect(result.title).toBe(dto.title);
+      expect(prisma.booking.create).toHaveBeenCalled();
+    });
+
+    it('returns cached response for idempotency key replay', async () => {
+      const cached = {
+        id: 'cached-id',
+        userId: ownerId,
+        title: dto.title,
+        startTime: dto.startTime,
+        endTime: dto.endTime,
+        status: BookingStatus.CONFIRMED,
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
+      prisma.bookingIdempotency.findFirst.mockResolvedValue({
+        responseBody: cached,
+      });
+
+      const result = await service.create(ownerId, dto, 'idem-key-1');
+
+      expect(result).toEqual(cached);
+      expect(prisma.booking.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('findAllForUser', () => {
+    it('returns bookings ordered by start time', async () => {
+      prisma.booking.findMany.mockResolvedValue([confirmedBooking]);
+
+      const result = await service.findAllForUser(ownerId);
+
+      expect(result).toHaveLength(1);
+      expect(prisma.booking.findMany).toHaveBeenCalledWith({
+        where: { userId: ownerId },
+        orderBy: { startTime: 'asc' },
+      });
+    });
   });
 
   describe('getAvailability', () => {

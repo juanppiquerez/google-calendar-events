@@ -1,8 +1,8 @@
 import Link from 'next/link';
-import { auth0 } from '@/lib/auth0';
+import { getAppSession } from '@/lib/get-app-session';
 
 export default async function Home() {
-  const session = await auth0.getSession();
+  const session = await getAppSession();
 
   if (!session) {
     return (

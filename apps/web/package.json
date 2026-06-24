@@ -6,9 +6,12 @@
     "dev": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
+    "start:e2e": "cp -r .next/static .next/standalone/apps/web/.next/static && cp -r public .next/standalone/apps/web/public && node .next/standalone/apps/web/server.js",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
-    "test": "echo \"No tests yet\" && exit 0"
+    "test": "npm run test:e2e",
+    "test:e2e": "playwright test",
+    "test:e2e:install": "playwright install chromium --with-deps"
   },
   "dependencies": {
     "@auth0/nextjs-auth0": "^4.23.0",
@@ -24,6 +27,7 @@
   },
   "devDependencies": {
     "@eslint/eslintrc": "^3",
+    "@playwright/test": "^1.52.0",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

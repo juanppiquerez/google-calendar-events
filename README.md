@@ -24,6 +24,7 @@ Full-stack monorepo for a scheduling system that validates booking conflicts aga
 │   └── shared-types/        # Shared TypeScript interfaces/DTOs
 ├── .github/workflows/       # CI pipelines
 ├── docker-compose.yml
+├── docker-compose.prod.yml
 └── turbo.json
 ```
 
@@ -107,8 +108,116 @@ This starts both `api` and `web` in watch mode via Turborepo.
 | `npm run build`      | Build all apps and packages              |
 | `npm run lint`       | Lint all workspaces                      |
 | `npm run typecheck`  | Type-check all workspaces                |
-| `npm run test`       | Run tests across workspaces              |
+| `npm run test`       | Run all tests (API unit + integration, Web E2E) |
 | `npm run format`     | Format code with Prettier                |
+
+### API tests (`apps/api`)
+
+| Command | Description |
+| ------- | ----------- |
+| `npm run test --workspace=api` | Unit tests (Jest) |
+| `npm run test:cov --workspace=api` | Unit tests with coverage report |
+| `npm run test:integration --workspace=api` | Integration tests (Postgres via Testcontainers or `TEST_DATABASE_URL`) |
+| `npm run test:e2e --workspace=api` | API smoke E2E (health check) |
+
+### Web tests (`apps/web`)
+
+| Command | Description |
+| ------- | ----------- |
+| `npm run test:e2e:install --workspace=web` | Install Playwright Chromium |
+| `npm run test:e2e --workspace=web` | Playwright E2E (requires `npm run build --workspace=web` first) |
+
+Integration tests use **Testcontainers** locally (Docker required). In CI, Postgres runs as a **GitHub Actions service** and tests connect via `TEST_DATABASE_URL`.
+
+E2E tests set `E2E_TEST_MODE=true` to bypass Auth0 session checks and mock API routes at the BFF layer.
+
+## Architecture overview
+
+```mermaid
+flowchart TB
+  subgraph Browser
+    U[Usuario]
+  end
+
+  subgraph Web["Next.js (apps/web)"]
+    BFF["API Routes /api/*"]
+    Auth0SDK["@auth0/nextjs-auth0"]
+  end
+
+  subgraph API["NestJS (apps/api)"]
+    JWT["JwtAuthGuard + JWKS"]
+    BS[BookingsService]
+    GS[GoogleService]
+    ENC[EncryptionService]
+  end
+
+  subgraph External
+    Auth0["Auth0 (identidad)"]
+    GCal["Google Calendar API<br/>freebusy.query"]
+  end
+
+  DB[(PostgreSQL 16)]
+
+  U --> Web
+  Auth0SDK <--> Auth0
+  BFF -->|"Bearer JWT"| JWT
+  JWT --> BS
+  BS --> DB
+  BS --> GS
+  GS --> ENC
+  GS --> GCal
+  GS --> DB
+```
+
+### OAuth flows (two separate concerns)
+
+```
+Auth0 login (app identity)          Google Calendar OAuth (calendar access)
+─────────────────────────          ─────────────────────────────────────
+User → Auth0 → JWT in httpOnly       User → GET /google/connect → Google consent
+cookie via Next.js SDK               → callback → encrypted tokens in DB
+```
+
+## Production deployment (Docker)
+
+For production, use `docker-compose.prod.yml` — Postgres is **not** exposed to the host:
+
+```bash
+cp .env.example .env
+# Fill all required values (see Environment variables below)
+
+docker compose -f docker-compose.prod.yml up --build -d
+```
+
+The API entrypoint always runs `prisma migrate deploy` (never `migrate dev`) before starting.
+
+For local development with host-accessible Postgres (port 5433), use the default `docker-compose.yml`.
+
+## Environment variables
+
+All variables are documented in [`.env.example`](./.env.example). Summary:
+
+| Variable | Used by | Description |
+| -------- | ------- | ----------- |
+| `DATABASE_URL` | API | PostgreSQL connection string |
+| `POSTGRES_DB`, `POSTGRES_USER`, `POSTGRES_PASSWORD` | Docker | Postgres container credentials |
+| `PORT` | API | API listen port (default `3001`) |
+| `WEB_PORT` | Docker | Host port for web container (default `3000`) |
+| `NODE_ENV` | API, Web | `development` \| `production` \| `test` |
+| `APP_BASE_URL` | API, Web | Public frontend URL (CORS, OAuth redirects) |
+| `NEXT_PUBLIC_API_URL` | Web | API URL exposed to the browser |
+| `API_URL` | Web | Server-side API URL (Docker: `http://api:3001`) |
+| `AUTH0_DOMAIN` | API, Web | Auth0 tenant domain |
+| `AUTH0_AUDIENCE` | API, Web | Auth0 API identifier |
+| `AUTH0_CLIENT_ID` | Web | Auth0 application client ID |
+| `AUTH0_CLIENT_SECRET` | Web | Auth0 client secret (server-only) |
+| `AUTH0_SECRET` | Web | Cookie encryption secret (`openssl rand -hex 32`) |
+| `GOOGLE_CLIENT_ID` | API | Google OAuth client ID |
+| `GOOGLE_CLIENT_SECRET` | API | Google OAuth client secret |
+| `GOOGLE_REDIRECT_URI` | API | Must match Google Cloud Console redirect URI |
+| `ENCRYPTION_KEY` | API | 64 hex chars — encrypts Google tokens at rest |
+| `TEST_DATABASE_URL` | API tests | Postgres for integration tests (set in CI) |
+| `E2E_TEST_MODE` | Web tests | Bypass Auth0 in Playwright (never in production) |
 
 ## Architecture decisions
 
@@ -261,4 +370,6 @@ Hardening measures applied before production testing and deploy:
 
 See [SECURITY.md](./SECURITY.md) for reporting vulnerabilities and operational guidance.
 
-<!-- Additional decisions will be documented here phase by phase. -->
+## Future improvements
+
+See [CHANGELOG.md](./CHANGELOG.md) for planned enhancements (Google webhooks, multi-calendar, email notifications, etc.).

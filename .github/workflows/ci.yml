@@ -15,9 +15,28 @@ jobs:
     name: Lint, typecheck, test & build
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_DB: booking_ci
+          POSTGRES_USER: booking
+          POSTGRES_PASSWORD: booking
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U booking -d booking_ci"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
     strategy:
       matrix:
         node-version: [20]
+
+    env:
+      TEST_DATABASE_URL: postgresql://booking:booking@localhost:5432/booking_ci
+      ENCRYPTION_KEY: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
     steps:
       - name: Checkout
@@ -41,11 +60,25 @@ jobs:
       - name: Typecheck
         run: npm run typecheck
 
-      - name: Test
-        run: npm run test
+      - name: Unit tests with coverage
+        run: npm run test:cov --workspace=api
 
       - name: Integration tests
         run: npm run test:integration --workspace=api
 
       - name: Build
         run: npm run build
+
+      - name: Install Playwright browsers
+        run: npm run test:e2e:install --workspace=web
+
+      - name: E2E tests
+        run: npm run test:e2e --workspace=web
+
+      - name: Upload coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: api-coverage
+          path: apps/api/coverage/
+          retention-days: 14

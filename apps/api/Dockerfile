@@ -31,6 +31,9 @@ FROM base AS runner
 ENV NODE_ENV=production
 WORKDIR /app
 
+RUN addgroup --system --gid 1001 nodejs && \
+    adduser --system --uid 1001 nestjs
+
 COPY package.json package-lock.json ./
 COPY apps/api/package.json ./apps/api/
 COPY packages/shared-types/package.json ./packages/shared-types/
@@ -42,9 +45,11 @@ RUN npm ci --omit=dev --workspace=api --include-workspace-root && \
 
 COPY --from=build /app/apps/api/dist ./apps/api/dist
 COPY apps/api/docker-entrypoint.sh ./apps/api/docker-entrypoint.sh
-RUN chmod +x ./apps/api/docker-entrypoint.sh
+RUN chmod +x ./apps/api/docker-entrypoint.sh && \
+    chown -R nestjs:nodejs /app
 
 WORKDIR /app/apps/api
+USER nestjs
 EXPOSE 3001
 ENTRYPOINT ["./docker-entrypoint.sh"]
 CMD ["node", "dist/main.js"]

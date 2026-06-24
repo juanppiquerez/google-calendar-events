@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { DashboardShell } from '@/app/components/dashboard-shell';
-import { auth0 } from '@/lib/auth0';
+import { getAppSession } from '@/lib/get-app-session';
 import { GoogleCalendarCard } from './google-calendar-card';
 
 export default async function DashboardPage({
@@ -8,7 +8,7 @@ export default async function DashboardPage({
 }: {
   searchParams: Promise<{ google?: string }>;
 }) {
-  const session = await auth0.getSession();
+  const session = await getAppSession();
   const params = await searchParams;
 
   if (!session) {

@@ -1,10 +1,10 @@
 import { redirect } from 'next/navigation';
 import { BookingForm } from '@/app/components/booking-form';
 import { DashboardShell } from '@/app/components/dashboard-shell';
-import { auth0 } from '@/lib/auth0';
+import { getAppSession } from '@/lib/get-app-session';
 
 export default async function NewBookingPage() {
-  const session = await auth0.getSession();
+  const session = await getAppSession();
 
   if (!session) {
     redirect('/auth/login?connection=google-oauth2');
