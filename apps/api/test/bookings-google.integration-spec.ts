@@ -1,9 +1,3 @@
-import {
-  PostgreSqlContainer,
-  StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
-import { execSync } from 'node:child_process';
-import path from 'node:path';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
@@ -17,15 +11,18 @@ import { GOOGLE_CALENDAR_CONFLICT_MESSAGE } from '../src/google/google.constants
 import { CALENDAR_CONFLICT_CHECKER } from '../src/google/google.types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { UsersService } from '../src/users/users.service';
-
-const API_ROOT = path.resolve(__dirname, '..');
+import {
+  setupPostgresTestDatabase,
+  teardownPostgresTestDatabase,
+  type PostgresTestContext,
+} from './helpers/postgres-test-setup';
 
 interface ErrorResponse {
   message: string;
 }
 
 describe('POST /bookings with Google Calendar conflict (integration)', () => {
-  let container: StartedPostgreSqlContainer;
+  let ctx: PostgresTestContext;
   let prisma: PrismaClient;
   let app: INestApplication<App>;
   let userId: string;
@@ -42,24 +39,9 @@ describe('POST /bookings with Google Calendar conflict (integration)', () => {
   };
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:16-alpine')
-      .withDatabase('booking_google_test')
-      .withUsername('test')
-      .withPassword('test')
-      .start();
-
-    const databaseUrl = container.getConnectionUri();
-    process.env.DATABASE_URL = databaseUrl;
+    ctx = await setupPostgresTestDatabase();
+    prisma = ctx.prisma;
     process.env.ENCRYPTION_KEY = 'c'.repeat(64);
-
-    execSync('npx prisma migrate deploy', {
-      cwd: API_ROOT,
-      env: { ...process.env, DATABASE_URL: databaseUrl },
-      stdio: 'pipe',
-    });
-
-    prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
-    await prisma.$connect();
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
       controllers: [BookingsController],
@@ -107,8 +89,7 @@ describe('POST /bookings with Google Calendar conflict (integration)', () => {
 
   afterAll(async () => {
     await app?.close();
-    await prisma?.$disconnect();
-    await container?.stop();
+    await teardownPostgresTestDatabase(ctx);
   });
 
   beforeEach(async () => {

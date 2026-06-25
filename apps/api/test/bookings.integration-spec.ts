@@ -1,43 +1,25 @@
-import {
-  PostgreSqlContainer,
-  StartedPostgreSqlContainer,
-} from '@testcontainers/postgresql';
-import { execSync } from 'node:child_process';
-import path from 'node:path';
 import { ConflictException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { PrismaClient } from '@prisma/client';
 import { CALENDAR_CONFLICT_CHECKER } from '../src/google/google.types';
 import { PrismaService } from '../src/prisma/prisma.service';
 import { BookingsService } from '../src/bookings/bookings.service';
-
-const API_ROOT = path.resolve(__dirname, '..');
+import {
+  setupPostgresTestDatabase,
+  teardownPostgresTestDatabase,
+  type PostgresTestContext,
+} from './helpers/postgres-test-setup';
 
 describe('BookingsService (integration)', () => {
-  let container: StartedPostgreSqlContainer;
+  let ctx: PostgresTestContext;
   let prisma: PrismaClient;
   let service: BookingsService;
   let userAId: string;
   let userBId: string;
 
   beforeAll(async () => {
-    container = await new PostgreSqlContainer('postgres:16-alpine')
-      .withDatabase('booking_test')
-      .withUsername('test')
-      .withPassword('test')
-      .start();
-
-    const databaseUrl = container.getConnectionUri();
-    process.env.DATABASE_URL = databaseUrl;
-
-    execSync('npx prisma migrate deploy', {
-      cwd: API_ROOT,
-      env: { ...process.env, DATABASE_URL: databaseUrl },
-      stdio: 'pipe',
-    });
-
-    prisma = new PrismaClient({ datasources: { db: { url: databaseUrl } } });
-    await prisma.$connect();
+    ctx = await setupPostgresTestDatabase();
+    prisma = ctx.prisma;
 
     const calendarConflictChecker = {
       hasConflict: jest.fn().mockResolvedValue(false),
@@ -77,8 +59,7 @@ describe('BookingsService (integration)', () => {
   }, 120_000);
 
   afterAll(async () => {
-    await prisma?.$disconnect();
-    await container?.stop();
+    await teardownPostgresTestDatabase(ctx);
   });
 
   beforeEach(async () => {
