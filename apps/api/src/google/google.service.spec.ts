@@ -202,9 +202,9 @@ describe('GoogleService.hasConflict', () => {
     expect(mockFreebusyQuery).toHaveBeenCalledTimes(1);
     const freebusyCall = (
       mockFreebusyQuery.mock.calls as unknown as [
-        { requestBody: { items: { id: string }[] } },
+        [{ requestBody: { items: { id: string }[] } }],
       ]
-    )[0];
+    )[0][0];
     expect(freebusyCall.requestBody.items).toEqual([
       { id: 'primary' },
       { id: 'work@company.com' },
@@ -229,9 +229,9 @@ describe('GoogleService.hasConflict', () => {
     expect(mockFreebusyQuery).toHaveBeenCalledTimes(1);
     const freebusyCall = (
       mockFreebusyQuery.mock.calls as unknown as [
-        { requestBody: { items: { id: string }[] } },
+        [{ requestBody: { items: { id: string }[] } }],
       ]
-    )[0];
+    )[0][0];
     expect(freebusyCall.requestBody.items).toEqual([{ id: 'primary' }]);
   });
 
@@ -359,14 +359,16 @@ describe('GoogleService OAuth and connection', () => {
     expect(mockGenerateAuthUrl).toHaveBeenCalledTimes(1);
     const authUrlCall = (
       mockGenerateAuthUrl.mock.calls as unknown as [
-        {
-          access_type: string;
-          prompt: string;
-          scope: string[];
-          state: string;
-        },
+        [
+          {
+            access_type: string;
+            prompt: string;
+            scope: string[];
+            state: string;
+          },
+        ],
       ]
-    )[0];
+    )[0][0];
     expect(authUrlCall.access_type).toBe('offline');
     expect(authUrlCall.prompt).toBe('consent');
     expect(authUrlCall.scope).toEqual(

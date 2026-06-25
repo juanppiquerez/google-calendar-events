@@ -330,20 +330,27 @@ describe('API endpoints (integration)', () => {
     });
 
     it('GET /google/status returns connected after token is stored', async () => {
+      const encryptionService = app.get(EncryptionService);
       await prisma.googleToken.create({
         data: {
           userId: userAId,
-          accessToken: 'enc-access',
-          refreshToken: 'enc-refresh',
+          accessToken: encryptionService.encrypt('test-access-token'),
+          refreshToken: encryptionService.encrypt('test-refresh-token'),
           expiryDate: new Date(Date.now() + 3_600_000),
           scope: 'https://www.googleapis.com/auth/calendar.freebusy',
           isValid: true,
         },
       });
 
+      const busyBlocksSpy = jest
+        .spyOn(app.get(GoogleService), 'getBusyBlocks')
+        .mockResolvedValue({ blocks: [] });
+
       const response = await request(app.getHttpServer())
         .get('/api/v1/google/status')
         .expect(200);
+
+      busyBlocksSpy.mockRestore();
 
       expect(response.body).toEqual({
         connected: true,
@@ -353,11 +360,12 @@ describe('API endpoints (integration)', () => {
     });
 
     it('DELETE /google/disconnect removes token', async () => {
+      const encryptionService = app.get(EncryptionService);
       await prisma.googleToken.create({
         data: {
           userId: userAId,
-          accessToken: 'enc-access',
-          refreshToken: 'enc-refresh',
+          accessToken: encryptionService.encrypt('test-access-token'),
+          refreshToken: encryptionService.encrypt('test-refresh-token'),
           expiryDate: new Date(Date.now() + 3_600_000),
           scope: 'https://www.googleapis.com/auth/calendar.freebusy',
           isValid: true,

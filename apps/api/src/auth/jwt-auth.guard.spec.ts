@@ -18,18 +18,18 @@ describe('JwtAuthGuard', () => {
     const expiredError = new Error('jwt expired');
     expiredError.name = 'TokenExpiredError';
 
-    expect(() =>
-      guard.handleRequest(null, false, expiredError),
-    ).toThrow(new UnauthorizedException('Access token expired'));
+    expect(() => guard.handleRequest(null, false, expiredError)).toThrow(
+      new UnauthorizedException('Access token expired'),
+    );
   });
 
   it('throws 401 when the JWT is invalid or missing', () => {
     const invalidError = new Error('jwt malformed');
     invalidError.name = 'JsonWebTokenError';
 
-    expect(() =>
-      guard.handleRequest(null, false, invalidError),
-    ).toThrow(new UnauthorizedException('Invalid or missing access token'));
+    expect(() => guard.handleRequest(null, false, invalidError)).toThrow(
+      new UnauthorizedException('Invalid or missing access token'),
+    );
   });
 
   it('throws 401 when user is false without specific token error', () => {
@@ -41,8 +41,8 @@ describe('JwtAuthGuard', () => {
   it('throws 401 when passport returns an error', () => {
     const authError = new Error('authentication failed');
 
-    expect(() =>
-      guard.handleRequest(authError, false, undefined),
-    ).toThrow(new UnauthorizedException('Invalid or missing access token'));
+    expect(() => guard.handleRequest(authError, false, undefined)).toThrow(
+      new UnauthorizedException('Invalid or missing access token'),
+    );
   });
 });
