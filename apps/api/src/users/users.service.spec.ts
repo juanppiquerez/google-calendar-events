@@ -23,10 +23,7 @@ describe('UsersService', () => {
     };
 
     const module: TestingModule = await Test.createTestingModule({
-      providers: [
-        UsersService,
-        { provide: PrismaService, useValue: prisma },
-      ],
+      providers: [UsersService, { provide: PrismaService, useValue: prisma }],
     }).compile();
 
     service = module.get(UsersService);
@@ -68,12 +65,10 @@ describe('UsersService', () => {
     ]);
 
     expect(prisma.user.upsert).toHaveBeenCalledTimes(3);
-    for (const call of prisma.user.upsert.mock.calls) {
-      expect(call[0]).toEqual({
-        where: { auth0Id: 'auth0|concurrent' },
-        create: input,
-        update: { email: input.email, name: input.name },
-      });
-    }
+    expect(prisma.user.upsert).toHaveBeenCalledWith({
+      where: { auth0Id: 'auth0|concurrent' },
+      create: input,
+      update: { email: input.email, name: input.name },
+    });
   });
 });

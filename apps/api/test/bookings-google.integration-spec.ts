@@ -20,6 +20,10 @@ import { UsersService } from '../src/users/users.service';
 
 const API_ROOT = path.resolve(__dirname, '..');
 
+interface ErrorResponse {
+  message: string;
+}
+
 describe('POST /bookings with Google Calendar conflict (integration)', () => {
   let container: StartedPostgreSqlContainer;
   let prisma: PrismaClient;
@@ -133,7 +137,8 @@ describe('POST /bookings with Google Calendar conflict (integration)', () => {
       .send(dto)
       .expect(409);
 
-    expect(response.body.message).toBe(GOOGLE_CALENDAR_CONFLICT_MESSAGE);
+    const body = response.body as ErrorResponse;
+    expect(body.message).toBe(GOOGLE_CALENDAR_CONFLICT_MESSAGE);
     expect(mockGoogleService.hasConflict).toHaveBeenCalledWith(
       userId,
       new Date(dto.startTime),

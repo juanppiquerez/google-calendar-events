@@ -19,9 +19,9 @@ describe('JwtAuthGuard', () => {
     const expiredError = new Error('jwt expired');
     expiredError.name = 'TokenExpiredError';
 
-    expect(() => guard.handleRequest(null, false, expiredError, context)).toThrow(
-      new UnauthorizedException('Access token expired'),
-    );
+    expect(() =>
+      guard.handleRequest(null, false, expiredError, context),
+    ).toThrow(new UnauthorizedException('Access token expired'));
   });
 
   it('throws 401 when the JWT is invalid or missing', () => {

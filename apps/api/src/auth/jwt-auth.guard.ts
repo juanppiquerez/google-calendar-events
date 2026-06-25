@@ -1,8 +1,4 @@
-import {
-  ExecutionContext,
-  Injectable,
-  UnauthorizedException,
-} from '@nestjs/common';
+import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import type { AuthUser } from './auth-user.interface';
 
@@ -12,7 +8,6 @@ export class JwtAuthGuard extends AuthGuard('jwt') {
     err: Error | null,
     user: TUser | false,
     info: Error | undefined,
-    _context: ExecutionContext,
   ): TUser {
     if (err || !user) {
       if (info?.name === 'TokenExpiredError') {

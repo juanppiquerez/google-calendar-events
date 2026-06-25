@@ -71,7 +71,11 @@ export class BookingsService {
 
     const googleCalendarConnected = Boolean(googleToken?.isValid);
     const googleBusy = googleCalendarConnected
-      ? await this.calendarConflictChecker.getBusyBlocks(userId, dayStart, dayEnd)
+      ? await this.calendarConflictChecker.getBusyBlocks(
+          userId,
+          dayStart,
+          dayEnd,
+        )
       : { blocks: [] as Array<{ start: string; end: string }> };
 
     const bookingSlots: OccupiedSlot[] = bookings.map((booking) => ({

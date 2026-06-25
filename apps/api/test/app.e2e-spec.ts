@@ -10,7 +10,8 @@ describe('Health (e2e)', () => {
 
   beforeEach(async () => {
     process.env.AUTH0_DOMAIN = process.env.AUTH0_DOMAIN ?? 'test.auth0.com';
-    process.env.AUTH0_AUDIENCE = process.env.AUTH0_AUDIENCE ?? 'https://test-api';
+    process.env.AUTH0_AUDIENCE =
+      process.env.AUTH0_AUDIENCE ?? 'https://test-api';
     process.env.APP_BASE_URL =
       process.env.APP_BASE_URL ?? 'http://localhost:3000';
 

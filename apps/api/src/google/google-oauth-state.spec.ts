@@ -18,7 +18,9 @@ describe('google-oauth-state', () => {
     const [encoded] = state.split('.');
     const tampered = `${encoded}.invalid-signature`;
 
-    expect(() => verifyOAuthState(tampered)).toThrow('Invalid OAuth state signature');
+    expect(() => verifyOAuthState(tampered)).toThrow(
+      'Invalid OAuth state signature',
+    );
   });
 
   it('rejects expired state', () => {

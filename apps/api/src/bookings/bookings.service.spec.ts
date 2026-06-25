@@ -1,4 +1,8 @@
-import { ConflictException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  ConflictException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { Booking, BookingStatus } from '@prisma/client';
 import { GOOGLE_CALENDAR_CONFLICT_MESSAGE } from '../google/google.constants';
@@ -46,7 +50,9 @@ describe('BookingsService', () => {
 
   beforeEach(async () => {
     calendarConflictChecker.hasConflict.mockReset().mockResolvedValue(false);
-    calendarConflictChecker.getBusyBlocks.mockReset().mockResolvedValue({ blocks: [] });
+    calendarConflictChecker.getBusyBlocks
+      .mockReset()
+      .mockResolvedValue({ blocks: [] });
 
     prisma = {
       booking: {

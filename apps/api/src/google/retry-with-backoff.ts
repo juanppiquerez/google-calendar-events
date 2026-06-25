@@ -9,13 +9,19 @@ export function isRetryableGoogleError(error: unknown): boolean {
     message?: string;
   };
 
-  const status = err.response?.status ?? (typeof err.code === 'number' ? err.code : undefined);
+  const status =
+    err.response?.status ??
+    (typeof err.code === 'number' ? err.code : undefined);
 
   if (status === 429 || status === 503) {
     return true;
   }
 
-  if (err.code === 'ETIMEDOUT' || err.code === 'ECONNRESET' || err.code === 'ENOTFOUND') {
+  if (
+    err.code === 'ETIMEDOUT' ||
+    err.code === 'ECONNRESET' ||
+    err.code === 'ENOTFOUND'
+  ) {
     return true;
   }
 

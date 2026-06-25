@@ -31,11 +31,9 @@ export class AllExceptionsFilter implements ExceptionFilter {
     if (exception instanceof HttpException) {
       const body = exception.getResponse();
       const payload =
-        typeof body === 'string'
-          ? { statusCode: status, message: body }
-          : body;
+        typeof body === 'string' ? { statusCode: status, message: body } : body;
 
-      if (this.isProduction && status >= HttpStatus.INTERNAL_SERVER_ERROR) {
+      if (this.isProduction && status >= 500) {
         response.status(status).json({
           statusCode: status,
           message: 'Internal server error',

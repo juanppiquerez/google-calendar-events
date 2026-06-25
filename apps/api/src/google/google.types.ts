@@ -19,7 +19,11 @@ export interface GoogleConnectionStatus {
 
 export interface CalendarConflictChecker {
   hasConflict(userId: string, start: Date, end: Date): Promise<boolean>;
-  getBusyBlocks(userId: string, start: Date, end: Date): Promise<BusyBlocksResult>;
+  getBusyBlocks(
+    userId: string,
+    start: Date,
+    end: Date,
+  ): Promise<BusyBlocksResult>;
 }
 
 export const CALENDAR_CONFLICT_CHECKER = Symbol('CALENDAR_CONFLICT_CHECKER');

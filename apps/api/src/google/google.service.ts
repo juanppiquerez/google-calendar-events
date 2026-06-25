@@ -17,7 +17,11 @@ import {
 } from './google.constants';
 import { signOAuthState, verifyOAuthState } from './google-oauth-state';
 import { mapGoogleApiError } from './google-api-errors';
-import type { BusyBlocksResult, CalendarConflictChecker, GoogleConnectionStatus } from './google.types';
+import type {
+  BusyBlocksResult,
+  CalendarConflictChecker,
+  GoogleConnectionStatus,
+} from './google.types';
 import { retryWithBackoff } from './retry-with-backoff';
 
 function isInvalidGrantError(error: unknown): boolean {
@@ -25,14 +29,14 @@ function isInvalidGrantError(error: unknown): boolean {
     return false;
   }
 
-  const err = error as { message?: string; response?: { data?: { error?: string } } };
+  const err = error as {
+    message?: string;
+    response?: { data?: { error?: string } };
+  };
   const message = err.message ?? '';
   const dataError = err.response?.data?.error ?? '';
 
-  return (
-    dataError === 'invalid_grant' ||
-    /invalid_grant/i.test(message)
-  );
+  return dataError === 'invalid_grant' || /invalid_grant/i.test(message);
 }
 
 function busyBlocksOverlap(
@@ -186,7 +190,11 @@ export class GoogleService implements CalendarConflictChecker {
       expiryDate.getTime() - Date.now() < TOKEN_REFRESH_BUFFER_MS;
 
     if (needsRefresh) {
-      const refreshed = await this.refreshAccessToken(userId, token, refreshToken);
+      const refreshed = await this.refreshAccessToken(
+        userId,
+        token,
+        refreshToken,
+      );
       if (!refreshed) {
         return {
           blocks: [],
@@ -200,7 +208,8 @@ export class GoogleService implements CalendarConflictChecker {
 
     try {
       const busy = await retryWithBackoff(
-        () => this.queryFreeBusy(accessToken, refreshToken, expiryDate, start, end),
+        () =>
+          this.queryFreeBusy(accessToken, refreshToken, expiryDate, start, end),
         GOOGLE_API_MAX_RETRIES,
         GOOGLE_API_INITIAL_BACKOFF_MS,
       );
@@ -333,7 +342,13 @@ export class GoogleService implements CalendarConflictChecker {
   }
 
   private mergeBusyBlocks(
-    calendars: Record<string, { busy?: Array<{ start?: string | null; end?: string | null }> }> | null | undefined,
+    calendars:
+      | Record<
+          string,
+          { busy?: Array<{ start?: string | null; end?: string | null }> }
+        >
+      | null
+      | undefined,
   ): Array<{ start?: string | null; end?: string | null }> {
     if (!calendars) {
       return [];

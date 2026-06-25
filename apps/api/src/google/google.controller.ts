@@ -1,11 +1,4 @@
-import {
-  Controller,
-  Delete,
-  Get,
-  Query,
-  Res,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, Delete, Get, Query, Res, UseGuards } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import {
   THROTTLE_STRICT_LIMIT,
@@ -57,7 +50,10 @@ export class GoogleController {
     }
 
     try {
-      const redirectUrl = await this.googleService.handleOAuthCallback(code, state);
+      const redirectUrl = await this.googleService.handleOAuthCallback(
+        code,
+        state,
+      );
       return res.redirect(redirectUrl);
     } catch {
       return res.redirect(`${base}/dashboard?google=error`);

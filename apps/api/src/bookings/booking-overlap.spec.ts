@@ -38,11 +38,15 @@ describe('rangesOverlap', () => {
   });
 
   it('detects overlap when ranges share only the start instant', () => {
-    expect(rangesOverlap(hour(10), hour(11), hour(10), hour(10, 30))).toBe(true);
+    expect(rangesOverlap(hour(10), hour(11), hour(10), hour(10, 30))).toBe(
+      true,
+    );
   });
 
   it('detects overlap when ranges share only the end instant', () => {
-    expect(rangesOverlap(hour(10), hour(11), hour(10, 30), hour(11))).toBe(true);
+    expect(rangesOverlap(hour(10), hour(11), hour(10, 30), hour(11))).toBe(
+      true,
+    );
   });
 
   it('returns false when one range ends before the other starts (gap)', () => {

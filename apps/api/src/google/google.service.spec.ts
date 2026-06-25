@@ -104,7 +104,8 @@ describe('GoogleService.hasConflict', () => {
 
     process.env.GOOGLE_CLIENT_ID = 'client-id';
     process.env.GOOGLE_CLIENT_SECRET = 'client-secret';
-    process.env.GOOGLE_REDIRECT_URI = 'http://localhost:3001/api/v1/google/callback';
+    process.env.GOOGLE_REDIRECT_URI =
+      'http://localhost:3001/api/v1/google/callback';
     process.env.ENCRYPTION_KEY = 'b'.repeat(64);
     process.env.APP_BASE_URL = 'http://localhost:3000';
 
@@ -198,11 +199,16 @@ describe('GoogleService.hasConflict', () => {
     });
 
     await expect(service.hasConflict(userId, start, end)).resolves.toBe(true);
-    expect(mockFreebusyQuery).toHaveBeenCalledWith({
-      requestBody: expect.objectContaining({
-        items: [{ id: 'primary' }, { id: 'work@company.com' }],
-      }),
-    });
+    expect(mockFreebusyQuery).toHaveBeenCalledTimes(1);
+    const freebusyCall = (
+      mockFreebusyQuery.mock.calls as unknown as [
+        { requestBody: { items: { id: string }[] } },
+      ]
+    )[0];
+    expect(freebusyCall.requestBody.items).toEqual([
+      { id: 'primary' },
+      { id: 'work@company.com' },
+    ]);
   });
 
   it('skips calendars the user deselected in Google Calendar', async () => {
@@ -220,11 +226,13 @@ describe('GoogleService.hasConflict', () => {
     });
 
     await expect(service.hasConflict(userId, start, end)).resolves.toBe(false);
-    expect(mockFreebusyQuery).toHaveBeenCalledWith({
-      requestBody: expect.objectContaining({
-        items: [{ id: 'primary' }],
-      }),
-    });
+    expect(mockFreebusyQuery).toHaveBeenCalledTimes(1);
+    const freebusyCall = (
+      mockFreebusyQuery.mock.calls as unknown as [
+        { requestBody: { items: { id: string }[] } },
+      ]
+    )[0];
+    expect(freebusyCall.requestBody.items).toEqual([{ id: 'primary' }]);
   });
 
   it('refreshes an expiring token and then checks freebusy', async () => {
@@ -271,7 +279,9 @@ describe('GoogleService.hasConflict', () => {
 
   it('returns false without throwing when Google API fails after retries', async () => {
     prisma.googleToken.findUnique.mockResolvedValue(validToken);
-    const timeoutError = Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' });
+    const timeoutError = Object.assign(new Error('timeout'), {
+      code: 'ETIMEDOUT',
+    });
     mockFreebusyQuery.mockRejectedValue(timeoutError);
 
     await expect(service.hasConflict(userId, start, end)).resolves.toBe(false);
@@ -307,7 +317,8 @@ describe('GoogleService OAuth and connection', () => {
 
     process.env.GOOGLE_CLIENT_ID = 'client-id';
     process.env.GOOGLE_CLIENT_SECRET = 'client-secret';
-    process.env.GOOGLE_REDIRECT_URI = 'http://localhost:3001/api/v1/google/callback';
+    process.env.GOOGLE_REDIRECT_URI =
+      'http://localhost:3001/api/v1/google/callback';
     process.env.ENCRYPTION_KEY = 'b'.repeat(64);
     process.env.APP_BASE_URL = 'http://localhost:3000';
 
@@ -338,22 +349,33 @@ describe('GoogleService OAuth and connection', () => {
   });
 
   it('getAuthorizationUrl returns OAuth URL with signed state', () => {
-    mockGenerateAuthUrl.mockReturnValue('https://accounts.google.com/o/oauth2/auth?state=signed');
+    mockGenerateAuthUrl.mockReturnValue(
+      'https://accounts.google.com/o/oauth2/auth?state=signed',
+    );
 
     const url = service.getAuthorizationUrl(userId);
 
     expect(url).toContain('accounts.google.com');
-    expect(mockGenerateAuthUrl).toHaveBeenCalledWith(
-      expect.objectContaining({
-        access_type: 'offline',
-        prompt: 'consent',
-        scope: expect.arrayContaining([
-          'https://www.googleapis.com/auth/calendar.freebusy',
-          'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
-        ]),
-        state: expect.any(String),
-      }),
+    expect(mockGenerateAuthUrl).toHaveBeenCalledTimes(1);
+    const authUrlCall = (
+      mockGenerateAuthUrl.mock.calls as unknown as [
+        {
+          access_type: string;
+          prompt: string;
+          scope: string[];
+          state: string;
+        },
+      ]
+    )[0];
+    expect(authUrlCall.access_type).toBe('offline');
+    expect(authUrlCall.prompt).toBe('consent');
+    expect(authUrlCall.scope).toEqual(
+      expect.arrayContaining([
+        'https://www.googleapis.com/auth/calendar.freebusy',
+        'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+      ]),
     );
+    expect(authUrlCall.state).toEqual(expect.any(String));
   });
 
   it('handleOAuthCallback stores encrypted tokens and returns success redirect', async () => {
@@ -370,7 +392,9 @@ describe('GoogleService OAuth and connection', () => {
 
     const redirectUrl = await service.handleOAuthCallback('auth-code', state);
 
-    expect(redirectUrl).toBe('http://localhost:3000/dashboard/google-connected');
+    expect(redirectUrl).toBe(
+      'http://localhost:3000/dashboard/google-connected',
+    );
     expect(prisma.googleToken.upsert).toHaveBeenCalled();
     expect(encryption.encrypt).toHaveBeenCalledWith('access-token');
     expect(encryption.encrypt).toHaveBeenCalledWith('refresh-token');
@@ -427,7 +451,9 @@ describe('GoogleService OAuth and connection', () => {
       isValid: true,
       syncHealthy: false,
     });
-    expect(status.syncError).toContain('Google Calendar API no está habilitada');
+    expect(status.syncError).toContain(
+      'Google Calendar API no está habilitada',
+    );
   });
 
   it('disconnect revokes token and deletes row', async () => {
@@ -440,7 +466,9 @@ describe('GoogleService OAuth and connection', () => {
     await service.disconnect(userId);
 
     expect(mockRevokeToken).toHaveBeenCalledWith('refresh-token');
-    expect(prisma.googleToken.delete).toHaveBeenCalledWith({ where: { userId } });
+    expect(prisma.googleToken.delete).toHaveBeenCalledWith({
+      where: { userId },
+    });
   });
 
   it('disconnect throws NotFoundException when not connected', async () => {

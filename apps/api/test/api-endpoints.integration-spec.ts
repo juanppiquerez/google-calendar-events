@@ -5,6 +5,7 @@ import request from 'supertest';
 import { App } from 'supertest/types';
 import { AuthUser } from '../src/auth/auth-user.interface';
 import { JwtAuthGuard } from '../src/auth/jwt-auth.guard';
+import { BookingResponse } from '../src/bookings/booking.mapper';
 import { BookingsController } from '../src/bookings/bookings.controller';
 import { BookingsService } from '../src/bookings/bookings.service';
 import { EncryptionService } from '../src/encryption/encryption.service';
@@ -21,12 +22,24 @@ import {
   type PostgresTestContext,
 } from './helpers/postgres-test-setup';
 
+interface ErrorResponse {
+  message: string;
+}
+
+interface CancelBookingResponse {
+  message: string;
+  booking: BookingResponse;
+}
+
+interface ConnectResponse {
+  url: string;
+}
+
 describe('API endpoints (integration)', () => {
   let ctx: PostgresTestContext;
   let prisma: PrismaClient;
   let app: INestApplication<App>;
   let userAId: string;
-  let userBId: string;
 
   const mockAuthUserA: AuthUser = {
     sub: 'auth0|user-a',
@@ -57,7 +70,8 @@ describe('API endpoints (integration)', () => {
     process.env.ENCRYPTION_KEY = 'd'.repeat(64);
     process.env.GOOGLE_CLIENT_ID = 'test-client-id';
     process.env.GOOGLE_CLIENT_SECRET = 'test-client-secret';
-    process.env.GOOGLE_REDIRECT_URI = 'http://localhost:3001/api/v1/google/callback';
+    process.env.GOOGLE_REDIRECT_URI =
+      'http://localhost:3001/api/v1/google/callback';
     process.env.APP_BASE_URL = 'http://localhost:3000';
 
     const moduleFixture: TestingModule = await Test.createTestingModule({
@@ -116,7 +130,7 @@ describe('API endpoints (integration)', () => {
         },
         update: {},
       });
-      const createdB = await prisma.user.upsert({
+      await prisma.user.upsert({
         where: { auth0Id: mockAuthUserB.sub },
         create: {
           auth0Id: mockAuthUserB.sub,
@@ -126,10 +140,8 @@ describe('API endpoints (integration)', () => {
         update: {},
       });
       userAId = createdA.id;
-      userBId = createdB.id;
     } else {
       userAId = userA.id;
-      userBId = userB.id;
     }
   }, 120_000);
 
@@ -146,11 +158,20 @@ describe('API endpoints (integration)', () => {
     mockGoogleService.getAuthorizationUrl.mockReturnValue(
       'https://accounts.google.com/o/oauth2/auth?test=1',
     );
-    mockGoogleService.getConnectionStatus.mockImplementation(async (userId: string) => {
-      const token = await prisma.googleToken.findUnique({ where: { userId } });
-      if (!token) return { connected: false, isValid: false, syncHealthy: false };
-      return { connected: true, isValid: token.isValid, syncHealthy: token.isValid };
-    });
+    mockGoogleService.getConnectionStatus.mockImplementation(
+      async (userId: string) => {
+        const token = await prisma.googleToken.findUnique({
+          where: { userId },
+        });
+        if (!token)
+          return { connected: false, isValid: false, syncHealthy: false };
+        return {
+          connected: true,
+          isValid: token.isValid,
+          syncHealthy: token.isValid,
+        };
+      },
+    );
     mockGoogleService.disconnect.mockImplementation(async (userId: string) => {
       await prisma.googleToken.deleteMany({ where: { userId } });
     });
@@ -169,20 +190,25 @@ describe('API endpoints (integration)', () => {
         .send(dto)
         .expect(201);
 
-      expect(response.body.title).toBe(dto.title);
-      expect(response.body.status).toBe('CONFIRMED');
+      const body = response.body as BookingResponse;
+      expect(body.title).toBe(dto.title);
+      expect(body.status).toBe('CONFIRMED');
     });
 
     it('returns 409 for internal overlap', async () => {
       const dto = futureSlot(96);
-      await request(app.getHttpServer()).post('/api/v1/bookings').send(dto).expect(201);
+      await request(app.getHttpServer())
+        .post('/api/v1/bookings')
+        .send(dto)
+        .expect(201);
 
       const response = await request(app.getHttpServer())
         .post('/api/v1/bookings')
         .send(dto)
         .expect(409);
 
-      expect(response.body.message).toMatch(/conflictúa/i);
+      const body = response.body as ErrorResponse;
+      expect(body.message).toMatch(/conflictúa/i);
     });
 
     it('returns 409 when Google reports a conflict', async () => {
@@ -194,21 +220,26 @@ describe('API endpoints (integration)', () => {
         .send(dto)
         .expect(409);
 
-      expect(response.body.message).toBe(GOOGLE_CALENDAR_CONFLICT_MESSAGE);
+      const body = response.body as ErrorResponse;
+      expect(body.message).toBe(GOOGLE_CALENDAR_CONFLICT_MESSAGE);
     });
   });
 
   describe('GET /bookings', () => {
     it('lists bookings for the authenticated user', async () => {
       const dto = futureSlot(144);
-      await request(app.getHttpServer()).post('/api/v1/bookings').send(dto).expect(201);
+      await request(app.getHttpServer())
+        .post('/api/v1/bookings')
+        .send(dto)
+        .expect(201);
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/bookings')
         .expect(200);
 
-      expect(response.body).toHaveLength(1);
-      expect(response.body[0].title).toBe(dto.title);
+      const bookings = response.body as BookingResponse[];
+      expect(bookings).toHaveLength(1);
+      expect(bookings[0]?.title).toBe(dto.title);
     });
   });
 
@@ -220,12 +251,15 @@ describe('API endpoints (integration)', () => {
         .send(dto)
         .expect(201);
 
+      const createdBody = created.body as BookingResponse;
+
       const response = await request(app.getHttpServer())
-        .delete(`/api/v1/bookings/${created.body.id}`)
+        .delete(`/api/v1/bookings/${createdBody.id}`)
         .expect(200);
 
-      expect(response.body.message).toBe('Booking cancelled successfully');
-      expect(response.body.booking.status).toBe('CANCELLED');
+      const body = response.body as CancelBookingResponse;
+      expect(body.message).toBe('Booking cancelled successfully');
+      expect(body.booking.status).toBe('CANCELLED');
     });
 
     it('returns 403 when cancelling another users booking', async () => {
@@ -235,10 +269,12 @@ describe('API endpoints (integration)', () => {
         .send(dto)
         .expect(201);
 
+      const createdBody = created.body as BookingResponse;
+
       currentAuthUser = mockAuthUserB;
 
       await request(app.getHttpServer())
-        .delete(`/api/v1/bookings/${created.body.id}`)
+        .delete(`/api/v1/bookings/${createdBody.id}`)
         .expect(403);
     });
 
@@ -249,15 +285,18 @@ describe('API endpoints (integration)', () => {
         .send(dto)
         .expect(201);
 
+      const createdBody = created.body as BookingResponse;
+
       await request(app.getHttpServer())
-        .delete(`/api/v1/bookings/${created.body.id}`)
+        .delete(`/api/v1/bookings/${createdBody.id}`)
         .expect(200);
 
       const response = await request(app.getHttpServer())
-        .delete(`/api/v1/bookings/${created.body.id}`)
+        .delete(`/api/v1/bookings/${createdBody.id}`)
         .expect(200);
 
-      expect(response.body.message).toBe('Booking is already cancelled');
+      const body = response.body as ErrorResponse;
+      expect(body.message).toBe('Booking is already cancelled');
     });
   });
 
@@ -266,13 +305,16 @@ describe('API endpoints (integration)', () => {
       const realGoogleService = app.get(GoogleService);
       jest
         .spyOn(realGoogleService, 'getAuthorizationUrl')
-        .mockReturnValue('https://accounts.google.com/o/oauth2/auth?state=test');
+        .mockReturnValue(
+          'https://accounts.google.com/o/oauth2/auth?state=test',
+        );
 
       const response = await request(app.getHttpServer())
         .get('/api/v1/google/connect')
         .expect(200);
 
-      expect(response.body.url).toContain('accounts.google.com');
+      const body = response.body as ConnectResponse;
+      expect(body.url).toContain('accounts.google.com');
     });
 
     it('GET /google/status returns disconnected by default', async () => {
@@ -323,13 +365,15 @@ describe('API endpoints (integration)', () => {
       });
 
       const realGoogleService = app.get(GoogleService);
-      jest.spyOn(realGoogleService, 'disconnect').mockResolvedValue(undefined);
+      const disconnectSpy = jest
+        .spyOn(realGoogleService, 'disconnect')
+        .mockResolvedValue(undefined);
 
       await request(app.getHttpServer())
         .delete('/api/v1/google/disconnect')
         .expect(200);
 
-      expect(realGoogleService.disconnect).toHaveBeenCalled();
+      expect(disconnectSpy).toHaveBeenCalled();
     });
   });
 });
