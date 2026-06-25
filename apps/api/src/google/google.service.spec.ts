@@ -1,5 +1,6 @@
 jest.mock('googleapis', () => {
   const mockFreebusyQuery = jest.fn();
+  const mockCalendarList = jest.fn();
   const mockRefreshAccessToken = jest.fn();
   const mockGenerateAuthUrl = jest.fn();
   const mockGetToken = jest.fn();
@@ -19,16 +20,16 @@ jest.mock('googleapis', () => {
       auth: { OAuth2 },
       calendar: jest.fn(() => ({
         freebusy: { query: mockFreebusyQuery },
+        calendarList: { list: mockCalendarList },
       })),
     },
     __mocks: {
       mockFreebusyQuery,
+      mockCalendarList,
       mockRefreshAccessToken,
       mockGenerateAuthUrl,
       mockGetToken,
       mockRevokeToken,
-      mockSetCredentials,
-      OAuth2,
     },
   };
 });
@@ -42,6 +43,7 @@ import { GoogleService } from './google.service';
 
 const {
   mockFreebusyQuery,
+  mockCalendarList,
   mockRefreshAccessToken,
   mockGenerateAuthUrl,
   mockGetToken,
@@ -49,12 +51,21 @@ const {
 } = jest.requireMock<{
   __mocks: {
     mockFreebusyQuery: jest.Mock;
+    mockCalendarList: jest.Mock;
     mockRefreshAccessToken: jest.Mock;
     mockGenerateAuthUrl: jest.Mock;
     mockGetToken: jest.Mock;
     mockRevokeToken: jest.Mock;
   };
 }>('googleapis').__mocks;
+
+function mockCalendarListWithPrimary() {
+  mockCalendarList.mockResolvedValue({
+    data: {
+      items: [{ id: 'primary', selected: true }],
+    },
+  });
+}
 
 describe('GoogleService.hasConflict', () => {
   let service: GoogleService;
@@ -89,6 +100,7 @@ describe('GoogleService.hasConflict', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockCalendarListWithPrimary();
 
     process.env.GOOGLE_CLIENT_ID = 'client-id';
     process.env.GOOGLE_CLIENT_SECRET = 'client-secret';
@@ -157,6 +169,62 @@ describe('GoogleService.hasConflict', () => {
     });
 
     await expect(service.hasConflict(userId, start, end)).resolves.toBe(true);
+  });
+
+  it('merges busy blocks from all selected calendars', async () => {
+    prisma.googleToken.findUnique.mockResolvedValue(validToken);
+    mockCalendarList.mockResolvedValue({
+      data: {
+        items: [
+          { id: 'primary', selected: true },
+          { id: 'work@company.com', selected: true },
+        ],
+      },
+    });
+    mockFreebusyQuery.mockResolvedValue({
+      data: {
+        calendars: {
+          primary: { busy: [] },
+          'work@company.com': {
+            busy: [
+              {
+                start: '2026-07-01T10:30:00.000Z',
+                end: '2026-07-01T11:30:00.000Z',
+              },
+            ],
+          },
+        },
+      },
+    });
+
+    await expect(service.hasConflict(userId, start, end)).resolves.toBe(true);
+    expect(mockFreebusyQuery).toHaveBeenCalledWith({
+      requestBody: expect.objectContaining({
+        items: [{ id: 'primary' }, { id: 'work@company.com' }],
+      }),
+    });
+  });
+
+  it('skips calendars the user deselected in Google Calendar', async () => {
+    prisma.googleToken.findUnique.mockResolvedValue(validToken);
+    mockCalendarList.mockResolvedValue({
+      data: {
+        items: [
+          { id: 'primary', selected: true },
+          { id: 'holidays@group.v.calendar.google.com', selected: false },
+        ],
+      },
+    });
+    mockFreebusyQuery.mockResolvedValue({
+      data: { calendars: { primary: { busy: [] } } },
+    });
+
+    await expect(service.hasConflict(userId, start, end)).resolves.toBe(false);
+    expect(mockFreebusyQuery).toHaveBeenCalledWith({
+      requestBody: expect.objectContaining({
+        items: [{ id: 'primary' }],
+      }),
+    });
   });
 
   it('refreshes an expiring token and then checks freebusy', async () => {
@@ -235,6 +303,7 @@ describe('GoogleService OAuth and connection', () => {
 
   beforeEach(async () => {
     jest.clearAllMocks();
+    mockCalendarListWithPrimary();
 
     process.env.GOOGLE_CLIENT_ID = 'client-id';
     process.env.GOOGLE_CLIENT_SECRET = 'client-secret';
@@ -278,6 +347,10 @@ describe('GoogleService OAuth and connection', () => {
       expect.objectContaining({
         access_type: 'offline',
         prompt: 'consent',
+        scope: expect.arrayContaining([
+          'https://www.googleapis.com/auth/calendar.freebusy',
+          'https://www.googleapis.com/auth/calendar.calendarlist.readonly',
+        ]),
         state: expect.any(String),
       }),
     );
@@ -309,19 +382,52 @@ describe('GoogleService OAuth and connection', () => {
     await expect(service.getConnectionStatus(userId)).resolves.toEqual({
       connected: false,
       isValid: false,
+      syncHealthy: false,
     });
   });
 
-  it('getConnectionStatus returns connected and validity from token', async () => {
+  it('getConnectionStatus returns sync health after probing Google Calendar', async () => {
     prisma.googleToken.findUnique.mockResolvedValue({
       userId,
+      accessToken: 'enc-access',
+      refreshToken: 'enc-refresh',
+      expiryDate: new Date(Date.now() + 60 * 60 * 1_000),
       isValid: true,
+    });
+    mockFreebusyQuery.mockResolvedValue({
+      data: { calendars: { primary: { busy: [] } } },
     });
 
     await expect(service.getConnectionStatus(userId)).resolves.toEqual({
       connected: true,
       isValid: true,
+      syncHealthy: true,
+      syncError: undefined,
     });
+  });
+
+  it('getConnectionStatus reports sync error when Google API fails', async () => {
+    prisma.googleToken.findUnique.mockResolvedValue({
+      userId,
+      accessToken: 'enc-access',
+      refreshToken: 'enc-refresh',
+      expiryDate: new Date(Date.now() + 60 * 60 * 1_000),
+      isValid: true,
+    });
+    mockFreebusyQuery.mockRejectedValue(
+      new Error(
+        'Google Calendar API has not been used in project 123 before or it is disabled.',
+      ),
+    );
+
+    const status = await service.getConnectionStatus(userId);
+
+    expect(status).toMatchObject({
+      connected: true,
+      isValid: true,
+      syncHealthy: false,
+    });
+    expect(status.syncError).toContain('Google Calendar API no está habilitada');
   });
 
   it('disconnect revokes token and deletes row', async () => {
@@ -345,7 +451,7 @@ describe('GoogleService OAuth and connection', () => {
     });
   });
 
-  it('getBusyBlocks returns empty array when token decryption fails', async () => {
+  it('getBusyBlocks returns sync error when token decryption fails', async () => {
     prisma.googleToken.findUnique.mockResolvedValue({
       userId,
       accessToken: 'bad-ciphertext',
@@ -357,12 +463,13 @@ describe('GoogleService OAuth and connection', () => {
       throw new Error('decrypt failed');
     });
 
-    await expect(
-      service.getBusyBlocks(
-        userId,
-        new Date('2026-07-01T10:00:00.000Z'),
-        new Date('2026-07-01T11:00:00.000Z'),
-      ),
-    ).resolves.toEqual([]);
+    const result = await service.getBusyBlocks(
+      userId,
+      new Date('2026-07-01T10:00:00.000Z'),
+      new Date('2026-07-01T11:00:00.000Z'),
+    );
+
+    expect(result.blocks).toEqual([]);
+    expect(result.syncError).toMatch(/conect/i);
   });
 });

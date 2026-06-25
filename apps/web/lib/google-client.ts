@@ -1,6 +1,8 @@
 export interface GoogleConnectionStatus {
   connected: boolean;
   isValid: boolean;
+  syncHealthy: boolean;
+  syncError?: string;
 }
 
 export class GoogleApiError extends Error {

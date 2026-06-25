@@ -52,4 +52,5 @@ export interface AvailabilityResponse {
   dayEnd: string;
   occupiedSlots: OccupiedSlot[];
   googleCalendarConnected: boolean;
+  googleCalendarSyncError?: string;
 }

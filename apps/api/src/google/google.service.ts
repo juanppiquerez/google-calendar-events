@@ -12,10 +12,12 @@ import {
   GOOGLE_API_INITIAL_BACKOFF_MS,
   GOOGLE_API_MAX_RETRIES,
   GOOGLE_CALENDAR_SCOPE,
+  GOOGLE_OAUTH_SCOPES,
   TOKEN_REFRESH_BUFFER_MS,
 } from './google.constants';
 import { signOAuthState, verifyOAuthState } from './google-oauth-state';
-import type { CalendarConflictChecker } from './google.types';
+import { mapGoogleApiError } from './google-api-errors';
+import type { BusyBlocksResult, CalendarConflictChecker, GoogleConnectionStatus } from './google.types';
 import { retryWithBackoff } from './retry-with-backoff';
 
 function isInvalidGrantError(error: unknown): boolean {
@@ -63,7 +65,7 @@ export class GoogleService implements CalendarConflictChecker {
     return client.generateAuthUrl({
       access_type: 'offline',
       prompt: 'consent',
-      scope: [GOOGLE_CALENDAR_SCOPE],
+      scope: [...GOOGLE_OAUTH_SCOPES],
       state: signOAuthState(userId),
     });
   }
@@ -93,16 +95,34 @@ export class GoogleService implements CalendarConflictChecker {
     return this.getSuccessRedirectUrl();
   }
 
-  async getConnectionStatus(userId: string): Promise<{ connected: boolean; isValid: boolean }> {
+  async getConnectionStatus(userId: string): Promise<GoogleConnectionStatus> {
     const token = await this.prisma.googleToken.findUnique({
       where: { userId },
     });
 
     if (!token) {
-      return { connected: false, isValid: false };
+      return { connected: false, isValid: false, syncHealthy: false };
     }
 
-    return { connected: true, isValid: token.isValid };
+    if (!token.isValid) {
+      return {
+        connected: true,
+        isValid: false,
+        syncHealthy: false,
+        syncError: mapGoogleApiError('invalid_grant'),
+      };
+    }
+
+    const now = new Date();
+    const probeEnd = new Date(now.getTime() + 60 * 60 * 1_000);
+    const { syncError } = await this.getBusyBlocks(userId, now, probeEnd);
+
+    return {
+      connected: true,
+      isValid: true,
+      syncHealthy: !syncError,
+      syncError,
+    };
   }
 
   async disconnect(userId: string): Promise<void> {
@@ -128,21 +148,21 @@ export class GoogleService implements CalendarConflictChecker {
   }
 
   async hasConflict(userId: string, start: Date, end: Date): Promise<boolean> {
-    const busy = await this.getBusyBlocks(userId, start, end);
-    return busyBlocksOverlap(busy, start, end);
+    const { blocks } = await this.getBusyBlocks(userId, start, end);
+    return busyBlocksOverlap(blocks, start, end);
   }
 
   async getBusyBlocks(
     userId: string,
     start: Date,
     end: Date,
-  ): Promise<Array<{ start: string; end: string }>> {
+  ): Promise<BusyBlocksResult> {
     const token = await this.prisma.googleToken.findUnique({
       where: { userId },
     });
 
     if (!token || !token.isValid) {
-      return [];
+      return { blocks: [] };
     }
 
     let accessToken: string;
@@ -156,7 +176,10 @@ export class GoogleService implements CalendarConflictChecker {
       this.logger.error(
         `Failed to decrypt Google tokens for user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return [];
+      return {
+        blocks: [],
+        syncError: mapGoogleApiError('Failed to decrypt Google tokens'),
+      };
     }
 
     const needsRefresh =
@@ -165,7 +188,10 @@ export class GoogleService implements CalendarConflictChecker {
     if (needsRefresh) {
       const refreshed = await this.refreshAccessToken(userId, token, refreshToken);
       if (!refreshed) {
-        return [];
+        return {
+          blocks: [],
+          syncError: mapGoogleApiError('invalid_grant'),
+        };
       }
 
       accessToken = refreshed.accessToken;
@@ -179,17 +205,22 @@ export class GoogleService implements CalendarConflictChecker {
         GOOGLE_API_INITIAL_BACKOFF_MS,
       );
 
-      return busy
-        .filter((block) => block.start && block.end)
-        .map((block) => ({
-          start: block.start!,
-          end: block.end!,
-        }));
+      return {
+        blocks: busy
+          .filter((block) => block.start && block.end)
+          .map((block) => ({
+            start: block.start!,
+            end: block.end!,
+          })),
+      };
     } catch (error) {
       this.logger.warn(
         `No se pudo consultar Google Calendar para user ${userId}: ${error instanceof Error ? error.message : String(error)}`,
       );
-      return [];
+      return {
+        blocks: [],
+        syncError: mapGoogleApiError(error),
+      };
     }
   }
 
@@ -252,16 +283,69 @@ export class GoogleService implements CalendarConflictChecker {
       expiryDate,
     );
     const calendar = google.calendar({ version: 'v3', auth: client });
+    const calendarIds = await this.listQueryableCalendarIds(calendar);
 
     const response = await calendar.freebusy.query({
       requestBody: {
         timeMin: start.toISOString(),
         timeMax: end.toISOString(),
-        items: [{ id: 'primary' }],
+        items: calendarIds.map((id) => ({ id })),
       },
     });
 
-    return response.data.calendars?.primary?.busy ?? [];
+    return this.mergeBusyBlocks(response.data.calendars);
+  }
+
+  private async listQueryableCalendarIds(
+    calendar: ReturnType<typeof google.calendar>,
+  ): Promise<string[]> {
+    try {
+      const ids: string[] = [];
+      let pageToken: string | undefined;
+
+      do {
+        const response = await calendar.calendarList.list({
+          pageToken,
+          minAccessRole: 'freeBusyReader',
+        });
+
+        for (const entry of response.data.items ?? []) {
+          if (!entry.id || entry.selected === false) {
+            continue;
+          }
+
+          ids.push(entry.id);
+        }
+
+        pageToken = response.data.nextPageToken ?? undefined;
+      } while (pageToken);
+
+      if (ids.length > 0) {
+        return ids;
+      }
+    } catch (error) {
+      this.logger.warn(
+        `No se pudo listar calendarios de Google; usando primary: ${error instanceof Error ? error.message : String(error)}`,
+      );
+    }
+
+    return ['primary'];
+  }
+
+  private mergeBusyBlocks(
+    calendars: Record<string, { busy?: Array<{ start?: string | null; end?: string | null }> }> | null | undefined,
+  ): Array<{ start?: string | null; end?: string | null }> {
+    if (!calendars) {
+      return [];
+    }
+
+    const merged: Array<{ start?: string | null; end?: string | null }> = [];
+
+    for (const calendar of Object.values(calendars)) {
+      merged.push(...(calendar.busy ?? []));
+    }
+
+    return merged;
   }
 
   private async upsertToken(

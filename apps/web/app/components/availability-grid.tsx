@@ -1,6 +1,7 @@
 'use client';
 
 import type { OccupiedSlot, OccupiedSlotSource } from '@booking/shared-types';
+import { fromZonedTime } from 'date-fns-tz';
 import { useMemo } from 'react';
 import { Skeleton } from '@/app/components/ui/skeleton';
 import { Spinner } from '@/app/components/ui/spinner';
@@ -16,7 +17,10 @@ interface SlotInfo {
   status: 'available' | 'booking' | 'google_calendar' | 'both';
 }
 
-function buildSlots(date: string): Array<{ label: string; start: Date; end: Date }> {
+function buildSlots(
+  date: string,
+  timeZone: string,
+): Array<{ label: string; start: Date; end: Date }> {
   const slots: Array<{ label: string; start: Date; end: Date }> = [];
 
   for (let hour = DAY_START_HOUR; hour < DAY_END_HOUR; hour++) {
@@ -29,8 +33,8 @@ function buildSlots(date: string): Array<{ label: string; start: Date; end: Date
 
       slots.push({
         label: `${startLabel} – ${endLabel}`,
-        start: new Date(`${date}T${startLabel}`),
-        end: new Date(`${date}T${endLabel}`),
+        start: fromZonedTime(`${date}T${startLabel}:00`, timeZone),
+        end: fromZonedTime(`${date}T${endLabel}:00`, timeZone),
       });
     }
   }
@@ -93,6 +97,7 @@ const STATUS_LABELS: Record<SlotInfo['status'], string> = {
 
 interface AvailabilityGridProps {
   date: string;
+  timeZone: string;
   occupiedSlots: OccupiedSlot[];
   isLoading?: boolean;
   isFetching?: boolean;
@@ -100,17 +105,18 @@ interface AvailabilityGridProps {
 
 export function AvailabilityGrid({
   date,
+  timeZone,
   occupiedSlots,
   isLoading = false,
   isFetching = false,
 }: AvailabilityGridProps) {
   const slots = useMemo(() => {
-    const base = buildSlots(date);
+    const base = buildSlots(date, timeZone);
     return base.map((slot) => ({
       ...slot,
       status: resolveSlotStatus(slot.start, slot.end, occupiedSlots),
     }));
-  }, [date, occupiedSlots]);
+  }, [date, timeZone, occupiedSlots]);
 
   if (isLoading) {
     return (

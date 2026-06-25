@@ -28,7 +28,7 @@ describe('POST /bookings with Google Calendar conflict (integration)', () => {
 
   const mockGoogleService = {
     hasConflict: jest.fn(),
-    getBusyBlocks: jest.fn().mockResolvedValue([]),
+    getBusyBlocks: jest.fn().mockResolvedValue({ blocks: [] }),
   };
 
   const mockAuthUser: AuthUser = {

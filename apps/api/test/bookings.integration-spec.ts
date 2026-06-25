@@ -41,7 +41,7 @@ describe('BookingsService (integration)', () => {
 
     const calendarConflictChecker = {
       hasConflict: jest.fn().mockResolvedValue(false),
-      getBusyBlocks: jest.fn().mockResolvedValue([]),
+      getBusyBlocks: jest.fn().mockResolvedValue({ blocks: [] }),
     };
 
     const module: TestingModule = await Test.createTestingModule({
@@ -159,12 +159,14 @@ describe('BookingsService (integration)', () => {
 
     const calendarConflictChecker = {
       hasConflict: jest.fn().mockResolvedValue(false),
-      getBusyBlocks: jest.fn().mockResolvedValue([
-        {
-          start: '2026-07-20T10:00:00.000Z',
-          end: '2026-07-20T11:00:00.000Z',
-        },
-      ]),
+      getBusyBlocks: jest.fn().mockResolvedValue({
+        blocks: [
+          {
+            start: '2026-07-20T10:00:00.000Z',
+            end: '2026-07-20T11:00:00.000Z',
+          },
+        ],
+      }),
     };
 
     const module: TestingModule = await Test.createTestingModule({

@@ -259,11 +259,18 @@ export function BookingForm() {
         <div className="mt-4">
           <AvailabilityGrid
             date={date}
+            timeZone={timeZone}
             occupiedSlots={availabilityQuery.data?.occupiedSlots ?? []}
             isLoading={availabilityQuery.isLoading}
             isFetching={availabilityQuery.isFetching && !availabilityQuery.isLoading}
           />
         </div>
+
+        {availabilityQuery.data?.googleCalendarSyncError && (
+          <p className="mt-4 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+            {availabilityQuery.data.googleCalendarSyncError}
+          </p>
+        )}
 
         {availabilityQuery.data && !availabilityQuery.data.googleCalendarConnected && (
           <p className="mt-4 text-xs text-neutral-500">

@@ -27,7 +27,7 @@ describe('BookingsService', () => {
 
   const calendarConflictChecker = {
     hasConflict: jest.fn().mockResolvedValue(false),
-    getBusyBlocks: jest.fn().mockResolvedValue([]),
+    getBusyBlocks: jest.fn().mockResolvedValue({ blocks: [] }),
   };
 
   const ownerId = 'owner-uuid';
@@ -46,7 +46,7 @@ describe('BookingsService', () => {
 
   beforeEach(async () => {
     calendarConflictChecker.hasConflict.mockReset().mockResolvedValue(false);
-    calendarConflictChecker.getBusyBlocks.mockReset().mockResolvedValue([]);
+    calendarConflictChecker.getBusyBlocks.mockReset().mockResolvedValue({ blocks: [] });
 
     prisma = {
       booking: {
@@ -170,12 +170,14 @@ describe('BookingsService', () => {
         },
       ]);
       prisma.googleToken.findUnique.mockResolvedValue({ isValid: true });
-      calendarConflictChecker.getBusyBlocks.mockResolvedValue([
-        {
-          start: '2026-07-15T16:00:00.000Z',
-          end: '2026-07-15T17:00:00.000Z',
-        },
-      ]);
+      calendarConflictChecker.getBusyBlocks.mockResolvedValue({
+        blocks: [
+          {
+            start: '2026-07-15T16:00:00.000Z',
+            end: '2026-07-15T17:00:00.000Z',
+          },
+        ],
+      });
 
       const result = await service.getAvailability(
         ownerId,

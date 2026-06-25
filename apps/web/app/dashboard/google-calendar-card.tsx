@@ -56,9 +56,16 @@ export function GoogleCalendarCard() {
     },
   });
 
-  const connected = statusQuery.data?.connected && statusQuery.data?.isValid;
+  const connected =
+    statusQuery.data?.connected &&
+    statusQuery.data?.isValid &&
+    statusQuery.data?.syncHealthy;
   const needsReconnect =
     statusQuery.data?.connected && statusQuery.data?.isValid === false;
+  const syncError =
+    statusQuery.data?.connected &&
+    statusQuery.data?.isValid &&
+    statusQuery.data?.syncError;
 
   return (
     <section
@@ -70,7 +77,8 @@ export function GoogleCalendarCard() {
       </h2>
       <p className="mt-2 text-sm text-neutral-600">
         Conectá tu calendario para detectar conflictos con eventos reales al crear
-        reservas. Es independiente del inicio de sesión con Auth0.
+        reservas. Se consultan todos los calendarios que tengás activos en Google.
+        Es independiente del inicio de sesión con Auth0.
       </p>
 
       {statusQuery.isLoading && (
@@ -100,15 +108,25 @@ export function GoogleCalendarCard() {
 
           {connected ? (
             <p className="text-sm font-medium text-emerald-800">
-              Google Calendar conectado
+              Google Calendar conectado y sincronizando correctamente
             </p>
           ) : needsReconnect ? (
             <p className="text-sm font-medium text-amber-800">
               Conexión expirada — reconectá tu cuenta de Google
             </p>
+          ) : syncError ? (
+            <p className="text-sm font-medium text-amber-800">
+              Conectado, pero no se pueden leer tus eventos
+            </p>
           ) : (
             <p className="text-sm font-medium text-amber-800">
               No conectado — conectá para ver conflictos de calendario
+            </p>
+          )}
+
+          {syncError && (
+            <p className="mt-2 rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+              {syncError}
             </p>
           )}
 
@@ -128,7 +146,7 @@ export function GoogleCalendarCard() {
               </button>
             )}
 
-            {(connected || needsReconnect) && (
+            {(connected || needsReconnect || syncError) && (
               <button
                 type="button"
                 onClick={() => setShowDisconnectConfirm(true)}

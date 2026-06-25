@@ -31,7 +31,7 @@ test.describe('Booking flow (E2E)', () => {
       await route.fulfill({
         status: 200,
         contentType: 'application/json',
-        body: JSON.stringify({ connected: false, isValid: false }),
+        body: JSON.stringify({ connected: false, isValid: false, syncHealthy: false }),
       });
     });
 

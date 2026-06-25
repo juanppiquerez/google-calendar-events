@@ -42,7 +42,7 @@ describe('API endpoints (integration)', () => {
 
   const mockGoogleService = {
     hasConflict: jest.fn(),
-    getBusyBlocks: jest.fn().mockResolvedValue([]),
+    getBusyBlocks: jest.fn().mockResolvedValue({ blocks: [] }),
     getAuthorizationUrl: jest.fn(),
     handleOAuthCallback: jest.fn(),
     getConnectionStatus: jest.fn(),
@@ -142,14 +142,14 @@ describe('API endpoints (integration)', () => {
     currentAuthUser = mockAuthUserA;
     jest.clearAllMocks();
     mockGoogleService.hasConflict.mockResolvedValue(false);
-    mockGoogleService.getBusyBlocks.mockResolvedValue([]);
+    mockGoogleService.getBusyBlocks.mockResolvedValue({ blocks: [] });
     mockGoogleService.getAuthorizationUrl.mockReturnValue(
       'https://accounts.google.com/o/oauth2/auth?test=1',
     );
     mockGoogleService.getConnectionStatus.mockImplementation(async (userId: string) => {
       const token = await prisma.googleToken.findUnique({ where: { userId } });
-      if (!token) return { connected: false, isValid: false };
-      return { connected: true, isValid: token.isValid };
+      if (!token) return { connected: false, isValid: false, syncHealthy: false };
+      return { connected: true, isValid: token.isValid, syncHealthy: token.isValid };
     });
     mockGoogleService.disconnect.mockImplementation(async (userId: string) => {
       await prisma.googleToken.deleteMany({ where: { userId } });
@@ -280,7 +280,11 @@ describe('API endpoints (integration)', () => {
         .get('/api/v1/google/status')
         .expect(200);
 
-      expect(response.body).toEqual({ connected: false, isValid: false });
+      expect(response.body).toEqual({
+        connected: false,
+        isValid: false,
+        syncHealthy: false,
+      });
     });
 
     it('GET /google/status returns connected after token is stored', async () => {
@@ -299,7 +303,11 @@ describe('API endpoints (integration)', () => {
         .get('/api/v1/google/status')
         .expect(200);
 
-      expect(response.body).toEqual({ connected: true, isValid: true });
+      expect(response.body).toEqual({
+        connected: true,
+        isValid: true,
+        syncHealthy: true,
+      });
     });
 
     it('DELETE /google/disconnect removes token', async () => {

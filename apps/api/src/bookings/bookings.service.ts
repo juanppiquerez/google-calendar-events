@@ -70,9 +70,9 @@ export class BookingsService {
     ]);
 
     const googleCalendarConnected = Boolean(googleToken?.isValid);
-    const googleBlocks = googleCalendarConnected
+    const googleBusy = googleCalendarConnected
       ? await this.calendarConflictChecker.getBusyBlocks(userId, dayStart, dayEnd)
-      : [];
+      : { blocks: [] as Array<{ start: string; end: string }> };
 
     const bookingSlots: OccupiedSlot[] = bookings.map((booking) => ({
       startTime: booking.startTime.toISOString(),
@@ -82,7 +82,7 @@ export class BookingsService {
       title: booking.title,
     }));
 
-    const googleSlots: OccupiedSlot[] = googleBlocks.map((block) => ({
+    const googleSlots: OccupiedSlot[] = googleBusy.blocks.map((block) => ({
       startTime: block.start,
       endTime: block.end,
       source: 'google_calendar',
@@ -99,6 +99,7 @@ export class BookingsService {
       dayEnd: dayEnd.toISOString(),
       occupiedSlots,
       googleCalendarConnected,
+      googleCalendarSyncError: googleBusy.syncError,
     };
   }
 

@@ -1,6 +1,19 @@
 /** Minimum scope for calendar.freebusy.query — see README for justification. */
-export const GOOGLE_CALENDAR_SCOPE =
+export const GOOGLE_CALENDAR_FREEBUSY_SCOPE =
   'https://www.googleapis.com/auth/calendar.freebusy';
+
+/** List subscribed calendars (IDs only) so freebusy covers all visible calendars. */
+export const GOOGLE_CALENDAR_LIST_READONLY_SCOPE =
+  'https://www.googleapis.com/auth/calendar.calendarlist.readonly';
+
+/** Scopes requested during Google OAuth connect. */
+export const GOOGLE_OAUTH_SCOPES = [
+  GOOGLE_CALENDAR_FREEBUSY_SCOPE,
+  GOOGLE_CALENDAR_LIST_READONLY_SCOPE,
+] as const;
+
+/** Space-delimited scope string stored on GoogleToken rows. */
+export const GOOGLE_CALENDAR_SCOPE = GOOGLE_OAUTH_SCOPES.join(' ');
 
 export const GOOGLE_CALENDAR_CONFLICT_MESSAGE =
   'El horario conflictúa con un evento en tu Google Calendar';

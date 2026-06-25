@@ -153,7 +153,7 @@ flowchart TB
 
   subgraph External
     Auth0["Auth0 (identidad)"]
-    GCal["Google Calendar API<br/>freebusy.query"]
+    GCal["Google Calendar API<br/>calendarList + freebusy.query"]
   end
 
   DB[(PostgreSQL 16)]
@@ -298,33 +298,54 @@ Overlapping bookings for the same user are prevented at two layers:
 
 Prisma cannot express this constraint declaratively, so it lives in a manual SQL migration (`btree_gist` extension + `Booking_no_overlap_confirmed`). When the constraint fires, Postgres returns SQLSTATE `23P01`, which the service maps to a `409 Conflict` with a user-facing message distinct from the in-code overlap check.
 
-3. **Google Calendar (optional)** — If the user has connected Google Calendar, `BookingsService` calls `GoogleService.hasConflict()` via the `CalendarConflictChecker` interface **after** the internal check and **before** INSERT. A busy block on the user's primary calendar returns `409` with a message that explicitly mentions Google Calendar. Users without a connected calendar skip this step entirely.
+3. **Google Calendar (optional)** — If the user has connected Google Calendar, `BookingsService` calls `GoogleService.hasConflict()` via the `CalendarConflictChecker` interface **after** the internal check and **before** INSERT. A busy block on any of the user's **selected** Google calendars returns `409` with a message that explicitly mentions Google Calendar. Users without a connected calendar skip this step entirely.
 
 **Idempotency** — Optional `Idempotency-Key` header on `POST /bookings` is stored in a `BookingIdempotency` table (unique per `userId` + key). Replays within 10 minutes return the original response without creating a duplicate booking.
 
 ### Google Calendar integration
 
-Google Calendar is connected through a **separate OAuth2 flow** from Auth0 login. The user must already be authenticated (Auth0 JWT) and then explicitly choose "Conectar Google Calendar" on the dashboard.
+Google Calendar is connected through a **separate OAuth2 flow** from Auth0 login. The user must already be authenticated (Auth0 JWT) and then explicitly choose **Conectar Google Calendar** on the dashboard. Logging in with Auth0 does **not** connect Google Calendar automatically.
+
+#### What this integration does (and does not do)
+
+| Behavior | Supported? |
+| -------- | ---------- |
+| Read busy/free blocks from Google Calendar to block conflicting bookings | Yes |
+| Show Google busy times in the availability grid (amber slots) | Yes |
+| Query all calendars **selected** in the Google Calendar sidebar | Yes |
+| Create or update events in Google Calendar when you make a booking | **No** — reservations live only in this app's database |
+| Read event titles, attendees, or descriptions from Google | **No** — only busy intervals via `freebusy.query` |
+| Real-time sync when Google events change | **No** — busy times are fetched on demand (see CHANGELOG for planned webhooks) |
 
 #### Google Cloud Console setup
 
 1. Create or select a project in [Google Cloud Console](https://console.cloud.google.com/).
-2. Enable the **Google Calendar API**: APIs & Services → Library → search "Google Calendar API" → Enable.
-3. Configure the **OAuth consent screen** (External or Internal, add your test users if External).
+2. **Enable the Google Calendar API** (critical): APIs & Services → Library → search **Google Calendar API** → **Enable**.
+   - OAuth consent alone is **not** enough. If the API is disabled, the app can show "connected" but return no events. The dashboard will surface a `syncError` explaining this.
+   - Wait 2–5 minutes after enabling before testing.
+3. Configure the **OAuth consent screen** (External or Internal; add test users if External and the app is in Testing mode).
 4. Create **OAuth 2.0 credentials** → Application type: **Web application**:
-   - **Authorized redirect URIs:** `http://localhost:3001/api/v1/google/callback` (adjust host/port for production; must match `GOOGLE_REDIRECT_URI` in `.env`).
+   - **Authorized redirect URIs:** `http://localhost:3001/api/v1/google/callback` (adjust host/port for production; must match `GOOGLE_REDIRECT_URI` in `.env` exactly).
 5. Copy **Client ID** and **Client secret** into `.env` as `GOOGLE_CLIENT_ID` and `GOOGLE_CLIENT_SECRET`.
+   - The same Google Cloud **project** must have the Calendar API enabled. A mismatch between credentials and project is a common source of errors.
 6. Generate `ENCRYPTION_KEY` for token encryption at rest:
 
    ```bash
    openssl rand -hex 32
    ```
 
+   If you change `ENCRYPTION_KEY` after tokens were stored, disconnect and reconnect Google Calendar — old tokens cannot be decrypted.
+
 #### OAuth scope choice
 
-We request `https://www.googleapis.com/auth/calendar.freebusy` — the most restrictive scope that still allows [`calendar.freebusy.query`](https://developers.google.com/calendar/api/v3/reference/freebusy/query). Unlike `calendar.readonly`, it grants only **availability** (busy/free blocks), not event titles, attendees, or descriptions. That matches our use case: detect overlaps without reading calendar content, improving privacy and least-privilege.
+We request two read-only scopes:
+
+- `calendar.freebusy` — query [`calendar.freebusy.query`](https://developers.google.com/calendar/api/v3/reference/freebusy/query) for busy/free blocks without reading event titles or descriptions.
+- `calendar.calendarlist.readonly` — list the user's subscribed calendars so freebusy covers **all calendars selected in Google Calendar**, not only `primary`.
 
 Conflict checks use **`freebusy.query`**, not `events.list`, because freebusy resolves recurring events into concrete busy intervals server-side.
+
+If you connected Google Calendar before multi-calendar support was added, **disconnect and reconnect** once so Google grants the new scope.
 
 #### API endpoints
 
@@ -332,14 +353,27 @@ Conflict checks use **`freebusy.query`**, not `events.list`, because freebusy re
 | ------ | ----- | ---- | ----------- |
 | `GET` | `/api/v1/google/connect` | JWT | Returns Google OAuth authorization URL |
 | `GET` | `/api/v1/google/callback` | — | OAuth redirect; exchanges code, stores encrypted tokens, redirects to frontend success page |
-| `GET` | `/api/v1/google/status` | JWT | Returns `{ connected, isValid }` |
+| `GET` | `/api/v1/google/status` | JWT | Returns `{ connected, isValid, syncHealthy, syncError? }` — probes Google Calendar when connected |
 | `DELETE` | `/api/v1/google/disconnect` | JWT | Revokes token with Google and deletes `GoogleToken` row |
+| `GET` | `/api/v1/bookings/availability` | JWT | Day availability: internal bookings + Google busy blocks. Query: `date` (YYYY-MM-DD), optional `timeZone` (IANA). Returns `googleCalendarConnected`, `googleCalendarSyncError?`, `occupiedSlots[]` |
 
 OAuth tokens (`accessToken`, `refreshToken`) are encrypted with **AES-256-GCM** before persistence (`ENCRYPTION_KEY`). The encryption service is the only layer that ever sees plaintext tokens.
 
+#### Availability in the UI
+
+- **Dashboard** — Google Calendar card shows connection state. If OAuth succeeded but Google API calls fail, you see *"Conectado, pero no se pueden leer tus eventos"* with `syncError` details.
+- **Bookings page / new booking form** — 30-minute slots from **07:00 to 21:00** in the user's local timezone:
+  - Green — available
+  - Red — internal booking
+  - Amber — busy on Google Calendar
+  - Orange — both
+- Events outside the 07:00–21:00 grid are still considered for conflict checks when creating a booking, but they are not shown in the grid.
+
 #### Resilience: degrade on Google API failure
 
-If Google Calendar is unreachable (429, 503, timeouts) after exponential-backoff retries, or if the user's refresh token was revoked (`invalid_grant`), **`hasConflict` returns `false`** and the booking proceeds based on internal checks only. A **WARNING** is logged (`no se pudo verificar Google Calendar, booking creado sin esa verificación`). This is an explicit product decision: Google Calendar is an enhancement, not a hard dependency — we never return `500` or block booking creation solely because Google failed.
+If Google Calendar is unreachable (API disabled, 429, 503, timeouts) after exponential-backoff retries, or if the user's refresh token was revoked (`invalid_grant`), **`hasConflict` returns `false`** and the booking proceeds based on internal checks only. A **WARNING** is logged server-side. This is an explicit product decision: Google Calendar is an enhancement, not a hard dependency — we never return `500` or block booking creation solely because Google failed.
+
+The UI still surfaces sync problems via `syncError` on `GET /google/status` and `googleCalendarSyncError` on `GET /bookings/availability` so users are not left thinking Google is working when it is not.
 
 Revoked tokens are marked `isValid: false` so the dashboard can prompt the user to reconnect.
 
@@ -350,7 +384,21 @@ Revoked tokens are marked `isValid: false` so the dashboard can prompt the user 
 3. User grants consent (`access_type=offline`, `prompt=consent` to obtain refresh token)
 4. Google redirects to `GET /api/v1/google/callback?code=…&state=…`
 5. API exchanges code, encrypts tokens, upserts `GoogleToken`, redirects to `/dashboard/google-connected`
-6. Future `POST /bookings` calls `freebusy.query` on the primary calendar before insert
+6. `GET /google/status` probes Google; `GET /bookings/availability` and `POST /bookings` call `calendarList.list` + `freebusy.query` on all **selected** calendars
+
+#### Troubleshooting Google Calendar
+
+| Symptom | Likely cause | Fix |
+| ------- | ------------ | --- |
+| Dashboard says connected but no Google events in the grid | **Google Calendar API not enabled** in the Cloud project tied to `GOOGLE_CLIENT_ID` | Enable the API in Cloud Console, wait a few minutes, disconnect + reconnect |
+| `syncError` mentions insufficient scopes | Token issued before scope update | Disconnect and reconnect Google Calendar |
+| Connected, then stopped working after `.env` change | `ENCRYPTION_KEY` changed — stored tokens cannot be decrypted | Restore the key or disconnect + reconnect |
+| Some Google events ignored | Calendar unchecked in Google Calendar sidebar | Enable that calendar in Google Calendar (must be `selected`) |
+| Event exists but slot stays green | Event marked **Free** (not busy) in Google | Change transparency to **Busy** in Google Calendar |
+| OAuth works locally but not in Docker | `GOOGLE_REDIRECT_URI` or `APP_BASE_URL` mismatch | Ensure redirect URI in Cloud Console matches API URL; rebuild containers after `.env` changes |
+| Still stuck | Server-side details | `docker compose logs api` — look for `GoogleService` warnings |
+
+**Checklist after setup:** Calendar API enabled → correct redirect URI → connect from dashboard → status shows `syncHealthy: true` → pick a date with known events → amber slots appear.
 
 ## Security
 
@@ -372,4 +420,4 @@ See [SECURITY.md](./SECURITY.md) for reporting vulnerabilities and operational g
 
 ## Future improvements
 
-See [CHANGELOG.md](./CHANGELOG.md) for planned enhancements (Google webhooks, multi-calendar, email notifications, etc.).
+See [CHANGELOG.md](./CHANGELOG.md) for planned enhancements (Google webhooks, writing bookings back to Google Calendar, email notifications, etc.).
