@@ -1,9 +1,8 @@
 import { JwtAuthGuard } from './jwt-auth.guard';
-import { ExecutionContext, UnauthorizedException } from '@nestjs/common';
+import { UnauthorizedException } from '@nestjs/common';
 
 describe('JwtAuthGuard', () => {
   let guard: JwtAuthGuard;
-  const context = {} as ExecutionContext;
 
   beforeEach(() => {
     guard = new JwtAuthGuard();
@@ -12,7 +11,7 @@ describe('JwtAuthGuard', () => {
   it('returns the user when the JWT is valid', () => {
     const user = { sub: 'auth0|123', email: 'user@example.com' };
 
-    expect(guard.handleRequest(null, user, undefined, context)).toEqual(user);
+    expect(guard.handleRequest(null, user, undefined)).toEqual(user);
   });
 
   it('throws 401 when the JWT is expired', () => {
@@ -20,7 +19,7 @@ describe('JwtAuthGuard', () => {
     expiredError.name = 'TokenExpiredError';
 
     expect(() =>
-      guard.handleRequest(null, false, expiredError, context),
+      guard.handleRequest(null, false, expiredError),
     ).toThrow(new UnauthorizedException('Access token expired'));
   });
 
@@ -29,12 +28,12 @@ describe('JwtAuthGuard', () => {
     invalidError.name = 'JsonWebTokenError';
 
     expect(() =>
-      guard.handleRequest(null, false, invalidError, context),
+      guard.handleRequest(null, false, invalidError),
     ).toThrow(new UnauthorizedException('Invalid or missing access token'));
   });
 
   it('throws 401 when user is false without specific token error', () => {
-    expect(() => guard.handleRequest(null, false, undefined, context)).toThrow(
+    expect(() => guard.handleRequest(null, false, undefined)).toThrow(
       new UnauthorizedException('Invalid or missing access token'),
     );
   });
@@ -43,7 +42,7 @@ describe('JwtAuthGuard', () => {
     const authError = new Error('authentication failed');
 
     expect(() =>
-      guard.handleRequest(authError, false, undefined, context),
+      guard.handleRequest(authError, false, undefined),
     ).toThrow(new UnauthorizedException('Invalid or missing access token'));
   });
 });
