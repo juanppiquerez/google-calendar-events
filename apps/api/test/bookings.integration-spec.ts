@@ -39,19 +39,23 @@ describe('BookingsService (integration)', () => {
 
     service = module.get(BookingsService);
 
-    const userA = await prisma.user.create({
-      data: {
+    const userA = await prisma.user.upsert({
+      where: { auth0Id: 'auth0|user-a' },
+      create: {
         auth0Id: 'auth0|user-a',
         email: 'user-a@example.com',
         name: 'User A',
       },
+      update: {},
     });
-    const userB = await prisma.user.create({
-      data: {
+    const userB = await prisma.user.upsert({
+      where: { auth0Id: 'auth0|user-b' },
+      create: {
         auth0Id: 'auth0|user-b',
         email: 'user-b@example.com',
         name: 'User B',
       },
+      update: {},
     });
 
     userAId = userA.id;
@@ -65,6 +69,7 @@ describe('BookingsService (integration)', () => {
   beforeEach(async () => {
     await prisma.bookingIdempotency.deleteMany();
     await prisma.booking.deleteMany();
+    await prisma.googleToken.deleteMany();
   });
 
   function futureSlot(hoursFromNow = 24) {
