@@ -19,7 +19,7 @@ export function ConfirmDialog({
   title,
   description,
   confirmLabel,
-  cancelLabel = 'Cancelar',
+  cancelLabel = 'Cancel',
   isPending = false,
   destructive = false,
   onConfirm,
@@ -82,7 +82,7 @@ export function ConfirmDialog({
                 : 'bg-neutral-900 hover:bg-neutral-800 focus-visible:outline-neutral-900'
             }`}
           >
-            {isPending ? 'Procesando…' : confirmLabel}
+            {isPending ? 'Processing…' : confirmLabel}
           </button>
         </div>
       </div>

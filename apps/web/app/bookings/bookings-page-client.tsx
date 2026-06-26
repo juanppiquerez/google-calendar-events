@@ -31,10 +31,10 @@ export function BookingsPageClient() {
     <div className="space-y-6">
       <header>
         <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">
-          Mis reservas
+          My bookings
         </h2>
         <p className="mt-1 text-sm text-neutral-600">
-          Consultá tu agenda y la disponibilidad horaria del día seleccionado.
+          View your schedule and time availability for the selected day.
         </p>
       </header>
 
@@ -48,15 +48,15 @@ export function BookingsPageClient() {
               id="day-availability-heading"
               className="text-lg font-semibold text-neutral-900"
             >
-              Disponibilidad del día
+              Day availability
             </h3>
             <p className="mt-1 text-sm text-neutral-600">
-              Horarios en {timeZone} · franjas de 30 minutos
+              Times in {timeZone} · 30-minute slots
             </p>
           </div>
           <div>
             <label htmlFor="selected-date" className="block text-sm font-medium text-neutral-700">
-              Fecha
+              Date
             </label>
             <input
               id="selected-date"
@@ -72,7 +72,7 @@ export function BookingsPageClient() {
           <div className="mt-4">
             <ErrorState
               error={availabilityQuery.error}
-              fallbackMessage="No se pudo cargar la disponibilidad"
+              fallbackMessage="Could not load availability"
               onRetry={() => void availabilityQuery.refetch()}
             />
           </div>
@@ -96,7 +96,7 @@ export function BookingsPageClient() {
 
         {availabilityQuery.data && !availabilityQuery.data.googleCalendarConnected && (
           <p className="mt-4 text-xs text-neutral-500">
-            Conectá Google Calendar desde el dashboard para ver también eventos externos.
+            Connect Google Calendar from the dashboard to also see external events.
           </p>
         )}
       </section>

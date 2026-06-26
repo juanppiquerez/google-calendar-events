@@ -122,29 +122,29 @@ test.describe('Booking flow (E2E)', () => {
     await expect(page.getByRole('heading', { name: 'Booking System' })).toBeVisible();
     await expect(page.getByText('E2E Test User')).toBeVisible();
 
-    await page.getByRole('link', { name: 'Configuración' }).click();
-    await expect(page.getByRole('heading', { name: 'Configuración' })).toBeVisible();
+    await page.getByRole('link', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
 
-    await page.getByRole('link', { name: 'Nueva reserva' }).click();
-    await expect(page.getByRole('heading', { name: 'Nueva reserva' })).toBeVisible();
+    await page.getByRole('link', { name: 'New booking' }).click();
+    await expect(page.getByRole('heading', { name: 'New booking' })).toBeVisible();
 
-    await page.getByLabel('Título').fill(bookingTitle);
+    await page.getByLabel('Title').fill(bookingTitle);
     await page.locator('#date').fill(date);
-    await page.getByLabel('Hora inicio').fill('10:00');
-    await page.getByLabel('Hora fin').fill('11:00');
-    await page.getByRole('button', { name: 'Crear reserva' }).click();
+    await page.getByLabel('Start time').fill('10:00');
+    await page.getByLabel('End time').fill('11:00');
+    await page.getByRole('button', { name: 'Create booking' }).click();
 
-    await expect(page.getByText('Reserva creada correctamente')).toBeVisible();
+    await expect(page.getByText('Booking created successfully')).toBeVisible();
 
-    await page.getByRole('link', { name: 'Mis reservas' }).click();
-    await expect(page.getByRole('heading', { name: 'Mis reservas' })).toBeVisible();
+    await page.getByRole('link', { name: 'My bookings' }).click();
+    await expect(page.getByRole('heading', { name: 'My bookings' })).toBeVisible();
     await expect(page.getByText(bookingTitle)).toBeVisible();
 
-    await page.getByRole('button', { name: 'Cancelar' }).click();
+    await page.getByRole('button', { name: 'Cancel' }).click();
     await expect(page.getByRole('dialog')).toBeVisible();
-    await page.getByRole('button', { name: 'Confirmar cancelación' }).click();
+    await page.getByRole('button', { name: 'Confirm cancellation' }).click();
 
-    await expect(page.getByText('Reserva cancelada correctamente')).toBeVisible();
-    await expect(page.getByText('Estado: Cancelada')).toBeVisible();
+    await expect(page.getByText('Booking cancelled successfully')).toBeVisible();
+    await expect(page.getByText('Status: Cancelled')).toBeVisible();
   });
 });

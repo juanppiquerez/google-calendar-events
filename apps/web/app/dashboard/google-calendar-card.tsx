@@ -36,7 +36,7 @@ export function GoogleCalendarCard() {
     onError: (error: unknown) => {
       redirectOnUnauthorized(error);
       toast.error(
-        getErrorMessage(error, 'No se pudo iniciar la conexión con Google'),
+        getErrorMessage(error, 'Could not start Google connection'),
       );
     },
   });
@@ -45,13 +45,13 @@ export function GoogleCalendarCard() {
     mutationFn: disconnectGoogle,
     onSuccess: () => {
       setShowDisconnectConfirm(false);
-      toast.success('Google Calendar desconectado');
+      toast.success('Google Calendar disconnected');
       void queryClient.invalidateQueries({ queryKey: GOOGLE_STATUS_KEY });
     },
     onError: (error: unknown) => {
       redirectOnUnauthorized(error);
       toast.error(
-        getErrorMessage(error, 'No se pudo desconectar Google Calendar'),
+        getErrorMessage(error, 'Could not disconnect Google Calendar'),
       );
     },
   });
@@ -76,9 +76,9 @@ export function GoogleCalendarCard() {
         Google Calendar
       </h2>
       <p className="mt-2 text-sm text-neutral-600">
-        Conectá tu calendario para detectar conflictos con eventos reales al crear
-        reservas. Se consultan todos los calendarios que tengás activos en Google.
-        Es independiente del inicio de sesión con Auth0.
+        Connect your calendar to detect conflicts with real events when creating
+        bookings. All calendars you have active in Google are checked. This is
+        independent from signing in with Auth0.
       </p>
 
       {statusQuery.isLoading && (
@@ -92,7 +92,7 @@ export function GoogleCalendarCard() {
         <div className="mt-4">
           <ErrorState
             error={statusQuery.error}
-            fallbackMessage="No se pudo cargar el estado de Google Calendar"
+            fallbackMessage="Could not load Google Calendar status"
             onRetry={() => void statusQuery.refetch()}
           />
         </div>
@@ -102,25 +102,25 @@ export function GoogleCalendarCard() {
         <div className="mt-4">
           {statusQuery.isFetching && !statusQuery.isLoading && (
             <div className="mb-3">
-              <Spinner label="Actualizando estado…" />
+              <Spinner label="Updating status…" />
             </div>
           )}
 
           {connected ? (
             <p className="text-sm font-medium text-emerald-800">
-              Google Calendar conectado y sincronizando correctamente
+              Google Calendar connected and syncing correctly
             </p>
           ) : needsReconnect ? (
             <p className="text-sm font-medium text-amber-800">
-              Conexión expirada — reconectá tu cuenta de Google
+              Connection expired — reconnect your Google account
             </p>
           ) : syncError ? (
             <p className="text-sm font-medium text-amber-800">
-              Conectado, pero no se pueden leer tus eventos
+              Connected, but your events cannot be read
             </p>
           ) : (
             <p className="text-sm font-medium text-amber-800">
-              No conectado — conectá para ver conflictos de calendario
+              Not connected — connect to see calendar conflicts
             </p>
           )}
 
@@ -139,10 +139,10 @@ export function GoogleCalendarCard() {
                 className="rounded-md bg-neutral-900 px-4 py-2 text-sm font-medium text-white hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 disabled:opacity-50"
               >
                 {connectMutation.isPending
-                  ? 'Redirigiendo…'
+                  ? 'Redirecting…'
                   : needsReconnect
-                    ? 'Reconectar Google Calendar'
-                    : 'Conectar Google Calendar'}
+                    ? 'Reconnect Google Calendar'
+                    : 'Connect Google Calendar'}
               </button>
             )}
 
@@ -152,7 +152,7 @@ export function GoogleCalendarCard() {
                 onClick={() => setShowDisconnectConfirm(true)}
                 className="rounded-md border border-neutral-300 px-4 py-2 text-sm font-medium hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
               >
-                Desconectar Google Calendar
+                Disconnect Google Calendar
               </button>
             )}
           </div>
@@ -161,9 +161,9 @@ export function GoogleCalendarCard() {
 
       <ConfirmDialog
         open={showDisconnectConfirm}
-        title="¿Desconectar Google Calendar?"
-        description="Las nuevas reservas ya no se verificarán contra tu calendario de Google. Podés volver a conectar cuando quieras."
-        confirmLabel="Confirmar desconexión"
+        title="Disconnect Google Calendar?"
+        description="New bookings will no longer be checked against your Google calendar. You can reconnect at any time."
+        confirmLabel="Confirm disconnection"
         destructive
         isPending={disconnectMutation.isPending}
         onCancel={() => setShowDisconnectConfirm(false)}

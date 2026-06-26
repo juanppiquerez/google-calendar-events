@@ -1,4 +1,4 @@
-export function Spinner({ label = 'Cargando' }: { label?: string }) {
+export function Spinner({ label = 'Loading' }: { label?: string }) {
   return (
     <div className="flex items-center gap-2 text-sm text-neutral-600" role="status">
       <span

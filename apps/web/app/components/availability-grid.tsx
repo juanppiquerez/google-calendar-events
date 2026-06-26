@@ -89,10 +89,10 @@ const STATUS_STYLES: Record<SlotInfo['status'], string> = {
 };
 
 const STATUS_LABELS: Record<SlotInfo['status'], string> = {
-  available: 'Disponible',
-  booking: 'Reserva interna',
+  available: 'Available',
+  booking: 'Internal booking',
   google_calendar: 'Google Calendar',
-  both: 'Ocupado (reserva + Google)',
+  both: 'Busy (booking + Google)',
 };
 
 interface AvailabilityGridProps {
@@ -120,7 +120,7 @@ export function AvailabilityGrid({
 
   if (isLoading) {
     return (
-      <div className="space-y-2" aria-busy="true" aria-label="Cargando disponibilidad">
+      <div className="space-y-2" aria-busy="true" aria-label="Loading availability">
         {Array.from({ length: 8 }).map((_, index) => (
           <Skeleton key={index} className="h-10 w-full" />
         ))}
@@ -132,7 +132,7 @@ export function AvailabilityGrid({
     <div>
       {isFetching && (
         <div className="mb-3">
-          <Spinner label="Actualizando disponibilidad…" />
+          <Spinner label="Updating availability…" />
         </div>
       )}
 
@@ -153,7 +153,7 @@ export function AvailabilityGrid({
       <div
         className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3"
         role="list"
-        aria-label={`Franjas horarias para ${date}`}
+        aria-label={`Time slots for ${date}`}
       >
         {slots.map((slot) => (
           <div

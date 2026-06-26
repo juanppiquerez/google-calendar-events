@@ -7,8 +7,8 @@ import { fetchGoogleStatus } from '@/lib/google-client';
 import { Skeleton } from '@/app/components/ui/skeleton';
 
 const NAV_ITEMS = [
-  { href: '/bookings', label: 'Mis reservas', exact: true },
-  { href: '/bookings/new', label: 'Nueva reserva', exact: false },
+  { href: '/bookings', label: 'My bookings', exact: true },
+  { href: '/bookings/new', label: 'New booking', exact: false },
 ] as const;
 
 interface DashboardShellProps {
@@ -52,21 +52,21 @@ export function DashboardShell({
               <Skeleton className="h-8 w-40" />
             ) : googleConnected ? (
               <span className="inline-flex items-center rounded-full bg-emerald-50 px-3 py-1 text-xs font-medium text-emerald-800 ring-1 ring-emerald-200">
-                Google Calendar conectado
+                Google Calendar connected
               </span>
             ) : googleNeedsReconnect ? (
               <Link
                 href="/dashboard"
                 className="inline-flex items-center rounded-full bg-amber-50 px-3 py-1 text-xs font-medium text-amber-800 ring-1 ring-amber-200 hover:bg-amber-100 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-amber-600"
               >
-                Reconectar Google Calendar
+                Reconnect Google Calendar
               </Link>
             ) : (
               <Link
                 href="/dashboard"
                 className="inline-flex items-center rounded-full bg-neutral-100 px-3 py-1 text-xs font-medium text-neutral-700 ring-1 ring-neutral-200 hover:bg-neutral-200 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-600"
               >
-                Conectar Google Calendar
+                Connect Google Calendar
               </Link>
             )}
 
@@ -74,7 +74,7 @@ export function DashboardShell({
               href="/auth/logout"
               className="rounded-md border border-neutral-300 px-3 py-1.5 text-sm font-medium text-neutral-800 hover:bg-neutral-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
             >
-              Cerrar sesión
+              Log out
             </a>
           </div>
         </div>
@@ -82,7 +82,7 @@ export function DashboardShell({
 
       <div className="mx-auto flex max-w-6xl flex-col gap-6 px-4 py-6 sm:px-6 lg:flex-row">
         <nav
-          aria-label="Secciones del dashboard"
+          aria-label="Dashboard sections"
           className="flex shrink-0 gap-2 lg:w-48 lg:flex-col"
         >
           {NAV_ITEMS.map((item) => {

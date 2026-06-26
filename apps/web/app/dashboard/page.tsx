@@ -17,16 +17,16 @@ export default async function DashboardPage({
 
   return (
     <DashboardShell
-      userName={session.user.name ?? session.user.email ?? 'Usuario'}
+      userName={session.user.name ?? session.user.email ?? 'User'}
       userEmail={session.user.email ?? undefined}
     >
       <div className="space-y-6">
         <header>
           <h2 className="text-2xl font-semibold tracking-tight text-neutral-900">
-            Configuración
+            Settings
           </h2>
           <p className="mt-1 text-sm text-neutral-600">
-            Gestioná la integración con Google Calendar y accedé a tus reservas.
+            Manage your Google Calendar integration and access your bookings.
           </p>
         </header>
 
@@ -35,7 +35,7 @@ export default async function DashboardPage({
             role="alert"
             className="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800"
           >
-            No se pudo conectar Google Calendar. Intentá de nuevo.
+            Could not connect Google Calendar. Please try again.
           </p>
         )}
 

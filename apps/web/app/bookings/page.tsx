@@ -12,7 +12,7 @@ export default async function BookingsPage() {
 
   return (
     <DashboardShell
-      userName={session.user.name ?? session.user.email ?? 'Usuario'}
+      userName={session.user.name ?? session.user.email ?? 'User'}
       userEmail={session.user.email ?? undefined}
     >
       <BookingsPageClient />

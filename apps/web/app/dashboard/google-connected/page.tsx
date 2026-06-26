@@ -18,11 +18,11 @@ export default async function GoogleConnectedPage() {
           ✅
         </p>
         <h1 className="mt-4 text-2xl font-semibold tracking-tight text-green-900">
-          Google Calendar conectado
+          Google Calendar connected
         </h1>
         <p className="mt-3 text-sm text-green-800">
-          Tu calendario quedó vinculado correctamente. Al crear reservas,
-          verificaremos conflictos con tus eventos de Google.
+          Your calendar has been linked successfully. When creating bookings, we
+          will check for conflicts with your Google events.
         </p>
       </div>
 
@@ -31,13 +31,13 @@ export default async function GoogleConnectedPage() {
           href="/dashboard"
           className="rounded-md bg-neutral-900 px-4 py-2 text-sm text-white hover:bg-neutral-800"
         >
-          Volver al dashboard
+          Back to dashboard
         </Link>
         <Link
           href="/bookings"
           className="rounded-md border border-neutral-300 px-4 py-2 text-sm hover:bg-neutral-50"
         >
-          Mis reservas
+          My bookings
         </Link>
       </div>
     </main>

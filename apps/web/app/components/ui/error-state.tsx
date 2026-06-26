@@ -15,7 +15,7 @@ interface ErrorStateProps {
 
 export function ErrorState({
   error,
-  fallbackMessage = 'Ocurrió un error inesperado',
+  fallbackMessage = 'An unexpected error occurred',
   onRetry,
 }: ErrorStateProps) {
   const message = getErrorMessage(error, fallbackMessage);
@@ -24,9 +24,9 @@ export function ErrorState({
   const isNetwork = isNetworkError(error);
 
   let title = 'Error';
-  if (isConflict) title = 'Conflicto de horario';
-  else if (isNetwork) title = 'Error de conexión';
-  else if (isServer) title = 'Error del servidor';
+  if (isConflict) title = 'Schedule conflict';
+  else if (isNetwork) title = 'Connection error';
+  else if (isServer) title = 'Server error';
 
   return (
     <div
@@ -45,7 +45,7 @@ export function ErrorState({
           onClick={onRetry}
           className="mt-3 rounded-md border border-current px-3 py-1.5 text-sm font-medium hover:bg-white/50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2"
         >
-          Reintentar
+          Retry
         </button>
       )}
     </div>

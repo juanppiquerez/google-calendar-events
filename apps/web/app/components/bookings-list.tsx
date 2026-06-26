@@ -27,7 +27,7 @@ export function BookingsList({ onDateSelect }: BookingsListProps) {
   const bookingsQuery = useQuery({
     queryKey: BOOKINGS_QUERY_KEY,
     queryFn: () => fetchBookings(),
-    meta: { errorMessage: 'No se pudieron cargar las reservas' },
+    meta: { errorMessage: 'Could not load bookings' },
   });
 
   useRedirectOnUnauthorized(bookingsQuery.error);
@@ -36,7 +36,7 @@ export function BookingsList({ onDateSelect }: BookingsListProps) {
     mutationFn: (id: string) => cancelBooking(id),
     onSuccess: () => {
       setCancelTarget(null);
-      toast.success('Reserva cancelada correctamente');
+      toast.success('Booking cancelled successfully');
       void queryClient.invalidateQueries({ queryKey: BOOKINGS_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ['availability'] });
     },
@@ -46,12 +46,12 @@ export function BookingsList({ onDateSelect }: BookingsListProps) {
         toast.error(error.message);
         return;
       }
-      toast.error(getErrorMessage(error, 'No se pudo cancelar la reserva'));
+      toast.error(getErrorMessage(error, 'Could not cancel the booking'));
     },
   });
 
   function statusLabel(status: BookingStatus) {
-    return status === BookingStatus.CONFIRMED ? 'Confirmada' : 'Cancelada';
+    return status === BookingStatus.CONFIRMED ? 'Confirmed' : 'Cancelled';
   }
 
   return (
@@ -61,10 +61,10 @@ export function BookingsList({ onDateSelect }: BookingsListProps) {
     >
       <div className="flex items-center justify-between gap-4">
         <h2 id="bookings-list-heading" className="text-lg font-semibold text-neutral-900">
-          Tus reservas
+          Your bookings
         </h2>
         {bookingsQuery.isFetching && !bookingsQuery.isLoading && (
-          <Spinner label="Actualizando…" />
+          <Spinner label="Updating…" />
         )}
       </div>
 
@@ -80,7 +80,7 @@ export function BookingsList({ onDateSelect }: BookingsListProps) {
         <div className="mt-4">
           <ErrorState
             error={bookingsQuery.error}
-            fallbackMessage="No se pudieron cargar las reservas"
+            fallbackMessage="Could not load bookings"
             onRetry={() => void bookingsQuery.refetch()}
           />
         </div>
@@ -88,7 +88,7 @@ export function BookingsList({ onDateSelect }: BookingsListProps) {
 
       {bookingsQuery.isSuccess && bookingsQuery.data.length === 0 && (
         <p className="mt-4 text-sm text-neutral-600">
-          Todavía no tenés reservas. Creá una desde &quot;Nueva reserva&quot;.
+          You don&apos;t have any bookings yet. Create one from &quot;New booking&quot;.
         </p>
       )}
 
@@ -109,7 +109,7 @@ export function BookingsList({ onDateSelect }: BookingsListProps) {
                 {formatLocalDateTime(booking.endTime).split(', ')[1]}
               </button>
               <p className="mt-1 text-xs text-neutral-500">
-                Estado: {statusLabel(booking.status)}
+                Status: {statusLabel(booking.status)}
               </p>
             </div>
 
@@ -119,7 +119,7 @@ export function BookingsList({ onDateSelect }: BookingsListProps) {
                 onClick={() => setCancelTarget(booking)}
                 className="self-start rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-700 hover:bg-red-50 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-red-600"
               >
-                Cancelar
+                Cancel
               </button>
             )}
           </li>
@@ -128,13 +128,13 @@ export function BookingsList({ onDateSelect }: BookingsListProps) {
 
       <ConfirmDialog
         open={cancelTarget !== null}
-        title="¿Cancelar reserva?"
+        title="Cancel booking?"
         description={
           cancelTarget
-            ? `Se cancelará "${cancelTarget.title}" (${formatLocalDateTime(cancelTarget.startTime)}).`
+            ? `This will cancel "${cancelTarget.title}" (${formatLocalDateTime(cancelTarget.startTime)}).`
             : ''
         }
-        confirmLabel="Confirmar cancelación"
+        confirmLabel="Confirm cancellation"
         destructive
         isPending={cancelMutation.isPending}
         onCancel={() => setCancelTarget(null)}

@@ -58,7 +58,7 @@ export function BookingForm() {
       setServerError(null);
       setClientError(null);
       setTitle('');
-      toast.success('Reserva creada correctamente');
+      toast.success('Booking created successfully');
       void queryClient.invalidateQueries({ queryKey: BOOKINGS_QUERY_KEY });
       void queryClient.invalidateQueries({ queryKey: ['availability'] });
     },
@@ -69,7 +69,7 @@ export function BookingForm() {
         toast.error(error.message);
         return;
       }
-      const message = getErrorMessage(error, 'No se pudo crear la reserva');
+      const message = getErrorMessage(error, 'Could not create the booking');
       setServerError(message);
       toast.error(message);
     },
@@ -104,16 +104,17 @@ export function BookingForm() {
         className="rounded-xl border border-neutral-200 bg-white p-5 shadow-sm sm:p-6"
       >
         <h2 id="new-booking-heading" className="text-lg font-semibold text-neutral-900">
-          Nueva reserva
+          New booking
         </h2>
         <p className="mt-1 text-sm text-neutral-600">
-          Horarios en tu zona local ({timeZone}). La validación final la realiza el servidor.
+          Times shown in your local timezone ({timeZone}). Final validation is performed by the
+          server.
         </p>
 
         <form onSubmit={handleSubmit} className="mt-5 space-y-4" noValidate>
           <div>
             <label htmlFor="title" className="block text-sm font-medium text-neutral-700">
-              Título
+              Title
             </label>
             <input
               id="title"
@@ -124,15 +125,15 @@ export function BookingForm() {
               value={title}
               onChange={(e) => setTitle(e.target.value)}
               className="mt-1 w-full rounded-md border border-neutral-300 px-3 py-2 text-sm text-neutral-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900"
-              placeholder="Reunión de equipo"
-              aria-invalid={clientError?.includes('título') ? true : undefined}
+              placeholder="Team meeting"
+              aria-invalid={clientError?.includes('title') ? true : undefined}
             />
           </div>
 
           <div className="grid gap-4 sm:grid-cols-3">
             <div>
               <label htmlFor="date" className="block text-sm font-medium text-neutral-700">
-                Fecha
+                Date
               </label>
               <input
                 id="date"
@@ -149,7 +150,7 @@ export function BookingForm() {
                 htmlFor="startTime"
                 className="block text-sm font-medium text-neutral-700"
               >
-                Hora inicio
+                Start time
               </label>
               <input
                 id="startTime"
@@ -163,7 +164,7 @@ export function BookingForm() {
             </div>
             <div>
               <label htmlFor="endTime" className="block text-sm font-medium text-neutral-700">
-                Hora fin
+                End time
               </label>
               <input
                 id="endTime"
@@ -192,14 +193,14 @@ export function BookingForm() {
             >
               {serverError && isGoogleCalendarConflict(serverError) ? (
                 <>
-                  <span className="font-medium">Conflicto con Google Calendar:</span>{' '}
+                  <span className="font-medium">Google Calendar conflict:</span>{' '}
                   {serverError}
                 </>
               ) : clientError ? (
                 displayError
               ) : isConflictError(displayError) ? (
                 <>
-                  <span className="font-medium">Conflicto de horario:</span>{' '}
+                  <span className="font-medium">Schedule conflict:</span>{' '}
                   {displayError}
                 </>
               ) : (
@@ -213,7 +214,7 @@ export function BookingForm() {
             disabled={createMutation.isPending}
             className="rounded-md bg-neutral-900 px-4 py-2.5 text-sm font-medium text-white hover:bg-neutral-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-neutral-900 disabled:opacity-50"
           >
-            {createMutation.isPending ? 'Creando…' : 'Crear reserva'}
+            {createMutation.isPending ? 'Creating…' : 'Create booking'}
           </button>
         </form>
       </section>
@@ -228,14 +229,14 @@ export function BookingForm() {
               id="availability-preview-heading"
               className="text-lg font-semibold text-neutral-900"
             >
-              Disponibilidad del día
+              Day availability
             </h2>
             <p className="mt-1 text-sm text-neutral-600">
-              Franjas de 30 minutos entre 07:00 y 21:00
+              30-minute slots between 07:00 and 21:00
             </p>
           </div>
           <label htmlFor="availability-date" className="sr-only">
-            Fecha para ver disponibilidad
+            Date to view availability
           </label>
           <input
             id="availability-date"
@@ -250,7 +251,7 @@ export function BookingForm() {
           <div className="mt-4">
             <ErrorState
               error={availabilityQuery.error}
-              fallbackMessage="No se pudo cargar la disponibilidad"
+              fallbackMessage="Could not load availability"
               onRetry={() => void availabilityQuery.refetch()}
             />
           </div>
@@ -274,7 +275,7 @@ export function BookingForm() {
 
         {availabilityQuery.data && !availabilityQuery.data.googleCalendarConnected && (
           <p className="mt-4 text-xs text-neutral-500">
-            Google Calendar no está conectado: solo se muestran reservas internas.
+            Google Calendar is not connected: only internal bookings are shown.
           </p>
         )}
       </section>
